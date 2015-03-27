@@ -23,7 +23,7 @@ public class PlayFabIntegration : MonoBehaviour {
 	private bool isAuthenticated = false;
 	private bool isJoined = false;
 	private Dictionary<string, int> userStats = new Dictionary<string, int>();
-	//private Dictionary<string, int> userStats = new Dictionary<string, int>();
+	private string team = string.Empty;
 	
 	// Use this for initialization
 	void Start()
@@ -95,13 +95,11 @@ public class PlayFabIntegration : MonoBehaviour {
 			{
 				case GuiStates.login:
 					 GUILayout.BeginArea(centralBox);
-						GUILayout.Label("Photon Custom Authentication with Playfab Credentials:");
-						GUILayout.Label("For the purposes of this demo, we will be using a static device id for login. We provide these credentials to Photon, which then checks the credentials and permits entry into the MasterServer--MainLobby.");
 						GUILayout.Label("");
-						GUILayout.Label("REQUIRED INFO: Photon App Id -- \"Window > Photon Unity Networking > PUN Wizard\"");
-						GUILayout.Label("REQUIRED INFO: PlayFab User Id -- Obtained after logging into PlayFab");
-						GUILayout.Label("REQUIRED INFO: PlayFab Authentication Ticket -- Obtained after logging into PlayFab");
-						GUILayout.Label("REQUIRED INFO: PlayFab Title Id -- Added in the inspector for PlayFabIntegration.cs");
+						GUILayout.Label("Photon Custom Authentication with Playfab Credentials:");
+						GUILayout.Label("For the purposes of this demo, we will be using a testing device id for the login credentials. We provide these credentials to Photon, which then validates and permits entry into the MasterServer--MainLobby. From the main lobby a user can create and join rooms and games. Doing so will in turn fire the web hook associated with the player action.");
+						GUILayout.Label("");
+				GUILayout.Label("In the bottom left you fill find the Photon Client Connection Status. You will see this box update to reflect the many changes in the client state,  Click below to contine.");
 						GUILayout.Label("");
 						if(GUILayout.Button("Login to PlayFab!"))
 						{
@@ -112,30 +110,32 @@ public class PlayFabIntegration : MonoBehaviour {
 				
 				case GuiStates.createRoom:
 					GUILayout.BeginArea(centralBox);	
-						GUILayout.Label("Starting a Photon Room (Game):");
-						GUILayout.Label("From the MainLobby, a player can join existing rooms or create a new one. For the purposes of this simple demo, you can create a new room by click.");
+						GUILayout.Label("");
+						GUILayout.Label("PlayFab Authentication Successful!");
+						GUILayout.Label("In the top left you can see the most up-to-date PlayFab PlayerStatistics for this user. You will see these stats change in real time as web hooks called to process game logic.");
+						GUILayout.Label("");
+						GUILayout.Label("Create & Join a Photon Room (Game):");
+						GUILayout.Label("From the MainLobby, a player can join existing rooms or create a new one. When you create and join a room our cloud script is randomly assigning the player to a team (Red or Blu) and tracking the results in Player Stats. Watch the stats (top left) to see on which team you are assigned.");
 						GUILayout.Label("");
 						if(GUILayout.Button("Create a new Photon Room"))
 						{
 							this.activeState = GuiStates.loading;
 							PhotonNetwork.CreateRoom(null);
-							//string roomName = Guid.NewGuid().ToString();
-							//PhotonNetwork.JoinOrCreateRoom(roomName, new RoomOptions(), new TypedLobby());
-							//PhotonNetwork.JoinRoom(roomName);
 						}
 					GUILayout.EndArea();	
 				break;
 				
 				case GuiStates.customEvents:
 					GUILayout.BeginArea(centralBox);
-						GUILayout.Label("Starting a Photon Room (Game):");
-						GUILayout.Label("Starting a Photon Room (Game):");
-						
-						GUILayout.Label("CUSTOM EVENTS");
-						if(GUILayout.Button("Award ExperiencePoints"))
+						GUILayout.Label("");
+						GUILayout.Label(string.Format("You are now in the game, welcome to the {0} team", this.team));
+						GUILayout.Label("While the game is running your loops and mechanics, custom events can be raised to augment your logic flow. These events can have custom input parameters as well as access to the basic Photon room details. With a event system this flexible, nearly every game can benifit.");
+						GUILayout.Label("");
+						GUILayout.Label("Examples of Custom Events:");
+						GUILayout.Label("");
+						if(GUILayout.Button("Award ExperiencePoints, Ding!"))
 						{
 							// Trigger Custom Event
-							
 							int expAward = UnityEngine.Random.Range(5000,10000);
 							Debug.Log("EXP: " + expAward);
 							PhotonNetwork.networkingPeer.OpRaiseEvent(
@@ -149,7 +149,7 @@ public class PlayFabIntegration : MonoBehaviour {
 							StartCoroutine(GetUserData(1.25f));
 						}
 							
-						if(GUILayout.Button("Award MVP"))
+						if(GUILayout.Button("Award MVP, you've earned it!"))
 						{
 							// Trigger Custom Event
 							PhotonNetwork.networkingPeer.OpRaiseEvent(
@@ -163,7 +163,7 @@ public class PlayFabIntegration : MonoBehaviour {
 								StartCoroutine(GetUserData(1.25f));
 						}
 						GUILayout.Label("");
-						if (GUILayout.Button("Leave Room"))
+						if (GUILayout.Button("Leave Room & Start Over"))
 						{
 							OnLogOut();	
 						}
@@ -173,7 +173,7 @@ public class PlayFabIntegration : MonoBehaviour {
 				
 				default:
 					GUILayout.BeginArea(centralBox);
-						GUILayout.Label("Loading...");
+						GUILayout.Label("Awaiting Server...");
 					GUILayout.EndArea();
 				break;
 			}	
@@ -210,6 +210,30 @@ public class PlayFabIntegration : MonoBehaviour {
 	
 	void OnGetUserDataSuccess(GetUserStatisticsResult result)
 	{
+		if(result.UserStatistics.ContainsKey("BluTeamJoinedCount") && this.userStats.ContainsKey("BluTeamJoinedCount"))
+		{
+			if(result.UserStatistics["BluTeamJoinedCount"] > this.userStats["BluTeamJoinedCount"] )
+			{
+				this.team = "Blu";
+			} 
+		}
+		else if(result.UserStatistics.ContainsKey("BluTeamJoinedCount") && !this.userStats.ContainsKey("BluTeamJoinedCount"))
+		{
+			this.team = "Blu";
+		}
+		
+		if(result.UserStatistics.ContainsKey("RedTeamJoinedCount") && this.userStats.ContainsKey("RedTeamJoinedCount"))
+		{
+			if(result.UserStatistics["RedTeamJoinedCount"] > this.userStats["RedTeamJoinedCount"] )
+			{
+				this.team = "Red";
+			} 
+		}
+		else if(result.UserStatistics.ContainsKey("RedTeamJoinedCount") && !this.userStats.ContainsKey("RedTeamJoinedCount"))
+		{
+			this.team = "Red";
+		}
+		
 		this.userStats = result.UserStatistics;
 	}
 	
@@ -228,6 +252,7 @@ public class PlayFabIntegration : MonoBehaviour {
 		this.isAuthenticated = false;
 		this.isJoined = false;
 		this.activeState = GuiStates.login;
+		this.team = string.Empty;
 		PhotonNetwork.LeaveRoom();
 		PhotonNetwork.Disconnect();
 	}
