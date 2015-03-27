@@ -131,7 +131,7 @@ public class PlayFabIntegration : MonoBehaviour {
 						GUILayout.Label(string.Format("You are now in the game, welcome to the {0} team", this.team));
 						GUILayout.Label("While the game is running your loops and mechanics, custom events can be raised to augment your logic flow. These events can have custom input parameters as well as access to the basic Photon room details. With a event system this flexible, nearly every game can benifit.");
 						GUILayout.Label("");
-						GUILayout.Label("Examples of Custom Events:");
+						GUILayout.Label("Examples of Custom Events (Triggers a stat update):");
 						GUILayout.Label("");
 						if(GUILayout.Button("Award ExperiencePoints, Ding!"))
 						{
