@@ -28,11 +28,12 @@ Once you have these factors in place, you are ready to web hook.
 
 Starting the Demo:
 -------------------------------------------------------------------------------------------------------------------------------------
-1) Open the Unity Project and load the scene: "DemoFriends-Scene";
+1) Open the Unity Project and load the scene: "DemoScene";
 2) Run in the editor
-3) Click the "Authenticate" text to beging
+3) Enter a nickname and click the button to to begin
 4) Starting here we are loading in our example code from PlayFabIntegration.cs
 5) Follow the on screen prompts to experience the game flow to trigger events which fire webhooks
+6) On the game view, you can hide the prompts by clicking the button (these will reappear after leaving the game.
 
 
 
@@ -40,17 +41,13 @@ Testing Info (REMOVE BEFORE MAKING PUBLIC):
 =====================================================================================================================================
 Title: FD3A
 Photon App Id: 5ee5d644-fcd7-40cc-8253-a2651e180254
-PlayFab Id: FC5704B9075819E6
-PlayFab Ticket: FC5704B9075819E6-0-0-FD3A-8D234A0A829B16F-BD9357D250AA308B.9507086BBC2031A7
 Android Device ID: a931f26995380c5a
 
 Left To Do:
 -------------------------------------------------------------------------------------------------------------------------------------
 + Address Bugs / questions I posted in Asana
-+ Work in new API that Matt is adding
 + Update text on the unity screens to be sufficiently verbose and instructive
 + Add more comments to C# code
-+ Art Pass on Unity UI?
 + Need to document this somewhere:
     Cloud Script Parameter "Args" Object:
     {
