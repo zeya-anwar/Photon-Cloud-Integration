@@ -258,6 +258,8 @@ public class DemoGUI : MonoBehaviour
         }
         
         GUI.color = this.playfabComponent.pf_orange;
+      	
+      	GUILayout.Label("Custom Room Events:");
 		if (GUILayout.Button("Win MVP"))
 		{
 			this.playfabComponent.AwardMVP();

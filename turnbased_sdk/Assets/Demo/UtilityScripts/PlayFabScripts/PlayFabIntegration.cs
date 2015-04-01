@@ -75,7 +75,7 @@ public class PlayFabIntegration : MonoBehaviour {
 //			
 			if(this.activeState == GuiStates.createRoom || this.activeState == GuiStates.customEvents || this.activeState == GuiStates.loading)
 			{
-				Rect statsRect = new Rect(Screen.width*.8f -5, Screen.height*.75f, Screen.width*.25f, Screen.height*.25f);
+				Rect statsRect = new Rect(Screen.width*.82f -5, Screen.height*.75f, Screen.width*.25f, Screen.height*.25f);
 				GUI.Box(statsRect, "");
 				
 				GUILayout.BeginArea(statsRect);
@@ -97,20 +97,7 @@ public class PlayFabIntegration : MonoBehaviour {
 					GUI.color = Color.white;
 				GUILayout.EndArea();
 			}
-//			
-//			GUILayout.BeginArea(new Rect(5,Screen.height*.85f, Screen.width*.5f, Screen.height*.15f));
-//				GUILayout.BeginHorizontal();
-//					GUILayout.Label("Photon Connection Status:");
-//				GUILayout.EndHorizontal();
-//				
-//				GUILayout.Label(string.Format("IsConnected: {0}, IsReady: {1}", PhotonNetwork.connected.ToString(), PhotonNetwork.connectedAndReady.ToString()));
-//				GUILayout.Label(string.Format("ConnectionState: {0}", PhotonNetwork.connectionStateDetailed.ToString()));
-//				if(PhotonNetwork.room != null)
-//				{
-//					GUILayout.Label(string.Format("CurrentRoom: {0}", PhotonNetwork.room.name));
-//				}
-//			GUILayout.EndArea();
-//
+//		
 			Rect centralBox = new Rect();
 			
 			if(hideTips == false)
@@ -126,8 +113,6 @@ public class PlayFabIntegration : MonoBehaviour {
 							GUI.color = Color.white;
 							GUILayout.Label("For the purposes of this demo, we will be using a testing device id for the login credentials. We provide these credentials to Photon, which then validates and permits entry into the MasterServer--MainLobby. From the main lobby a user can create and join rooms and games. Doing so will in turn fire the web hook associated with the player action.");
 							GUILayout.Label("");
-							//GUILayout.Label("In the bottom left you fill find the Photon Client Connection Status. You will see this box update to reflect the many changes in the client state,  Click below to contine.");
-							//GUILayout.Label("");
 							GUI.color = Color.white;
 						GUILayout.EndArea();	
 					break;
@@ -140,7 +125,6 @@ public class PlayFabIntegration : MonoBehaviour {
 							GUILayout.Label("PlayFab Authentication Successful!");
 							GUI.color = Color.white;
 							GUILayout.Label("In the bottm right you can see the most up-to-date PlayFab PlayerStatistics for this user. You will see these stats change in real time as web hooks are called to process game logic.");
-							//GUILayout.Label("");
 							GUILayout.Label("From the MainLobby, a player can join existing rooms or create a new one. When you create and join a room our cloud script is randomly assigning the player to a team (Red or Blu) and tracking the results in Player Stats. Watch the stats to see on which team you are assigned.");
 							GUI.color = Color.white;
 						GUILayout.EndArea();	
@@ -153,11 +137,11 @@ public class PlayFabIntegration : MonoBehaviour {
 							GUI.color = this.pf_orange;
 							GUILayout.Label(string.Format("You are now in the game, welcome to the {0} team", this.team));
 							GUI.color = Color.white;
-							GUILayout.Label("While the game is running your loops and mechanics, custom events can be raised to augment your logic flow. These events can have custom input parameters as well as access to the basic Photon room details. With a event system this flexible, nearly every game can benifit.");
+							GUILayout.Label("While the game is running your loops and mechanics, custom room events can be raised to augment your logic flow. These events can have custom input parameters as well as access basic Photon room details. This provides an all-purpose, flexible event system to benifit most game mode types");
 							GUILayout.Label("");
 							GUI.color = Color.white;
 							
-							if(GUILayout.Button("Ok, I got it (hide these tips)"))
+							if(GUILayout.Button("Ok, I got it. [hide these tips]"))
 							{
 								this.hideTips = true;
 							}
