@@ -3,7 +3,7 @@ README for PlayFab / Photon Integration for Custom Authentication and Webhooks
 
 Overview:
 -------------------------------------------------------------------------------------------------------------------------------------
-This project uses the Photon Unity Networking (PUN) plugin and demo to illustrate how functions in the PlayFab cloud script environment can be called automatically from the Photon Turn Based web hooks service. This is a powerful combination of convenience and flexibility that can give your title event-driven game logic running in a secured cloud environment with access the the entire PlayFab Client and Server API set.
+This project uses the Photon Cloud Turnbased plugin and demo to illustrate how functions in the PlayFab cloud script environment can be called automatically from the Photon Turn Based web hooks service. This is a powerful combination of convenience and flexibility that can give your title event-driven game logic running in a secured cloud environment with access the the entire PlayFab Client and Server API set.
 
 The demo (DemoFriends-Scene provides) provides a simple and straightforward approach to getting your events working. We added a PlayFabIntegration.cs class to the Scripts GameObject, a component which contains our examples. 
 
@@ -20,9 +20,9 @@ Prerequisites:
 Credentials: 
 + PlayFab Title Id: this is the id of your PlayFab game. We are using "FD3A", and this can be found at the top of PlayFabIntegration.cs
 + PlayFab Authentication: For this example we are using a testing account tied to a testing device. You will want to change this if you wish authenticate with your own users.
-    ++ PlayFab User Id: Obtained after authentication, provided to the PUN SDK for CustomAuthentication. 
-    ++ PlayFab Authentication Ticket: Obtained after authentication, provided to the PUN SDK for CustomAuthentication.
-+ Photon App Id: A GUID that uniquely defines your title. This can be found by visiting "PlayFab game manager > Servers > Photon" and should be saved into the PUN Setup Wizard
+    ++ PlayFab User Id: Obtained after authentication, provided to the Photon SDK for CustomAuthentication. 
+    ++ PlayFab Authentication Ticket: Obtained after authentication, provided to the Photon SDK for CustomAuthentication.
++ Photon App Id: A GUID that uniquely defines your title. This can be found by visiting "PlayFab game manager > Servers > Photon" and should be saved into the Photon Setup Wizard
 
 Once you have these factors in place, you are ready to web hook. 
 
@@ -37,7 +37,7 @@ Starting the Demo:
 
 
 
-Testing Info (REMOVE BEFORE MAKING PUBLIC):
+Testing Info:
 =====================================================================================================================================
 Title: FD3A
 Photon App Id: 5ee5d644-fcd7-40cc-8253-a2651e180254
