@@ -13,12 +13,12 @@ Prerequisites: / Credentials:
 There are several factors which must be in place before triggering your web hooks. For the purposes of getting up and running as fast as possible, we have included several test resources that will need to be replaced by your own.
 
 Prerequisites:
-+ PlayFab Title: You must have a title on PlayFab before proceeding. This demo uses title "FD3A"
++ PlayFab Title: You must have a title on PlayFab before proceeding. This demo uses title "FD3A", which you can use for basic testing. To view and modify the script or catalog, you will need to use your own Title Id
 + Cloud Script: Your title must have a valid Cloud Script file uploaded to the servers tab. Ours can be found under "unity_photon_demo/CloudScript"
 + Photon: You must activate the Photon capabilities on your title. This can be done by visiting  "PlayFab game manager > Servers > Photon"
 
 Credentials: 
-+ PlayFab Title Id: this is the id of your PlayFab game. We are using "FD3A", and this can be found at the top of PlayFabIntegration.cs
++ PlayFab Title Id: this is the id of the PlayFab game in use, and can be found at the top of PlayFabIntegration.cs. It defaults to the demo script id "FD3A"
 + PlayFab Authentication: For this example we are using a testing account tied to a testing device. You will want to change this if you wish authenticate with your own users.
     ++ PlayFab User Id: Obtained after authentication, provided to the Photon SDK for CustomAuthentication. 
     ++ PlayFab Authentication Ticket: Obtained after authentication, provided to the Photon SDK for CustomAuthentication.
