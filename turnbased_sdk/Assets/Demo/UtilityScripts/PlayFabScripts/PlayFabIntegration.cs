@@ -8,61 +8,74 @@ using PlayFab.ClientModels;
 using PlayFab.Internal;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
+
+/// <summary>
+/// Play fab integration. Contains all the logic and GUI for illustrating how playfab credentials can be used with Photon custom authentication.
+/// </summary>
 public class PlayFabIntegration : MonoBehaviour {
+	// gui variables for the playfab overlay
 	public int gui_depth = 0;
 	public Texture2D pf_logo;
 	public Rect logoDims;
+	public enum GuiStates {off=0, login=1, createRoom=2, customEvents=3, loading=4 }
+	public GuiStates activeState = GuiStates.off; 
+	public Color32 pf_orange = new Color32(250, 130,0, 255);
+	public Color32 pf_blue = new Color32(0, 173,239,255);
 	
+	// reference to the photon demo GUI script
 	public DemoGUI photonComponent; 
 	
 	// using PlayFab testing account and title
 	const string deviceId = "a931f26995380c5a";
-	const string playfabTitleId = "FD3A";
-	
-	public enum GuiStates {off=0, login=1, createRoom=2, customEvents=3, loading=4 }
-	public GuiStates activeState = GuiStates.off; 
-	
-	
+	const string playfabTitleId = "FD3A"; 
+
+	// some vars used in gui logic
 	private bool isAuthenticated = false;
 	private bool isJoined = false;
-	public bool hideTips = false;
-	private Dictionary<string, int> userStats = new Dictionary<string, int>();
+	private bool hideTips = false;
 	private string team = string.Empty;
 	private string playfabId = string.Empty;
-	public Color32 pf_orange = new Color32(250, 130,0, 255);
-	public Color32 pf_blue = new Color32(0, 173,239,255);
 	
-	// Use this for initialization
+	// userStats maps to the stats stored on each PlayFab user id  
+	private Dictionary<string, int> userStats = new Dictionary<string, int>();
+
+#region unity engine
 	void Start()
 	{
 		
-		PlayFabSettings.TitleId = playfabTitleId;
-		this.activeState = GuiStates.login;
+		PlayFabSettings.TitleId = playfabTitleId; // PlayFab title must be stored for the web API calls to succeed.
+		this.activeState = GuiStates.login; // Initialization of our active state, awaitng the player's login to playfab.
 	}
 	
 	void OnGUI()
 	{
+	
+		// await our photon session, and poll for certain state changes.
 		if(photonComponent.GameInstance != null)
 		{
+			// this is triggered when our session has joined the master server.
 			if(photonComponent.GameInstance.State == ExitGames.Client.Photon.LoadBalancing.ClientState.JoinedLobby && this.isAuthenticated == false)
 			{
 				this.isAuthenticated = true;
 				this.activeState = GuiStates.createRoom;
-				StartCoroutine(GetUserData(1.0f));
+				// refresh our player stats after the photon webhooks have had time to run
+				StartCoroutine(GetUserStats(1.0f));
 			}
+			// this is triggered when our session has joined a photon game room
 			else if(photonComponent.GameInstance.State == ExitGames.Client.Photon.LoadBalancing.ClientState.Joined && this.isJoined == false)
 			{
 				this.isJoined = true;		
 				this.activeState = GuiStates.customEvents;
-				StartCoroutine(GetUserData(1.0f));
+				// refresh our player stats after the photon webhooks have had time to run
+				StartCoroutine(GetUserStats(1.0f));
 			}
 		}
 		
-//	
+//	Draw the PlayFab overlay prompts 
 		if(this.activeState != GuiStates.off)
 		{
 			GUI.depth = this.gui_depth;
-//			
+		
 			if(pf_logo != null && this.hideTips == false)
 			{	
 				GUI.Box(new Rect(0, Screen.height * .75f, Screen.width, Screen.height*25f), "");
@@ -72,7 +85,7 @@ public class PlayFabIntegration : MonoBehaviour {
 				GUI.DrawTexture(new Rect(5, Screen.height - this.logoDims.height, this.logoDims.width, this.logoDims.height), this.pf_logo);	
 					
 			}
-//			
+			
 			if(this.activeState == GuiStates.createRoom || this.activeState == GuiStates.customEvents || this.activeState == GuiStates.loading)
 			{
 				Rect statsRect = new Rect(Screen.width*.82f -5, Screen.height*.75f, Screen.width*.25f, Screen.height*.25f);
@@ -97,7 +110,7 @@ public class PlayFabIntegration : MonoBehaviour {
 					GUI.color = Color.white;
 				GUILayout.EndArea();
 			}
-//		
+		
 			Rect centralBox = new Rect();
 			
 			if(hideTips == false)
@@ -159,8 +172,10 @@ public class PlayFabIntegration : MonoBehaviour {
 			}
 		}
 	}
-	
-	
+#endregion
+
+#region API Call Examples and Callbacks	
+	// Example of how to raise a custom event which triggers the RoomEventRaised web hook.
 	public void AwardMVP()
 	{
 		// Trigger Custom Event
@@ -172,9 +187,10 @@ public class PlayFabIntegration : MonoBehaviour {
 			{
 				ForwardToWebhook = true,
 			});
-			StartCoroutine(GetUserData(1.25f));	
+			StartCoroutine(GetUserStats(1.25f));	
 	}
 	
+	// Example of how to raise a custom event which triggers the RoomEventRaised web hook and supplies custom parameters.
 	public void GrantExperience()
 	{
 		//Trigger Custom Event
@@ -188,10 +204,10 @@ public class PlayFabIntegration : MonoBehaviour {
 		{
 			ForwardToWebhook = true,
 		});
-		StartCoroutine(GetUserData(1.25f));
+		StartCoroutine(GetUserStats(1.25f));
 	}
 	
-	
+	// standard example for logging in with an Android device id
 	public void LoginToPlayFab()
 	{
 		Debug.Log("Using demo device id");
@@ -203,31 +219,36 @@ public class PlayFabIntegration : MonoBehaviour {
 		this.activeState = GuiStates.loading;
 	}
 	
+	// callback on successful LoginToPlayFab request 
 	void OnLoginSuccess(LoginResult result)
 	{
-		//Debug.Log(result.SessionTicket);
-		StartCoroutine(GetUserData());
+		StartCoroutine(GetUserStats());
 		this.playfabId = result.PlayFabId;
 		GetPhotonAuthenticationTokenRequest request = new GetPhotonAuthenticationTokenRequest();
 		request.PhotonApplicationId = photonComponent.AppId.Trim();
+		// get an authentication ticket to pass on to Photon 
 		PlayFabClientAPI.GetPhotonAuthenticationToken(request, OnPhotonAuthenticationSuccess, OnPlayFabError);
 	}
 	
+	// callback on successful GetPhotonAuthenticationToken request 
 	void OnPhotonAuthenticationSuccess(GetPhotonAuthenticationTokenResult result)
 	{
 		//Debug.Log (string.Format("pfid:{0}, photon:{1}", this.playfabId, result.PhotonCustomAuthenticationToken));
 		photonComponent.ConnectToMasterServer(this.playfabId, result.PhotonCustomAuthenticationToken);
 	}
 	
-	IEnumerator GetUserData(float sec = 0)
+	// Example for getting the user statistics for a player.
+	IEnumerator GetUserStats(float sec = 0)
 	{
 		yield return new WaitForSeconds(sec);
 		GetUserStatisticsRequest request = new GetUserStatisticsRequest();
-		PlayFabClientAPI.GetUserStatistics(request, OnGetUserDataSuccess, OnPlayFabError);
+		PlayFabClientAPI.GetUserStatistics(request, OnGetUserStatsSuccess, OnPlayFabError);
 	}
 	
-	void OnGetUserDataSuccess(GetUserStatisticsResult result)
+	// callback on successful GetUserStats request
+	void OnGetUserStatsSuccess(GetUserStatisticsResult result)
 	{
+		// some logic for determineing if the player's team changed.
 		if(result.UserStatistics.ContainsKey("BluTeamJoinedCount") && this.userStats.ContainsKey("BluTeamJoinedCount"))
 		{
 			if(result.UserStatistics["BluTeamJoinedCount"] > this.userStats["BluTeamJoinedCount"] )
@@ -261,29 +282,21 @@ public class PlayFabIntegration : MonoBehaviour {
 				Debug.Log(result.UserStatistics["RedTeamJoinedCount"] + " : red");
 			}
 		}
-		
+		// save user stats for game useage
 		this.userStats = result.UserStatistics;
 	}
-	
+
+	// Generic PlayFab callback for errors.
 	void OnPlayFabError(PlayFabError error)
 	{
 		Debug.Log(error.ErrorMessage);
 	}
+#endregion
 
-//	public void SetStateAuthInput()
-//	{
-//		this.activeState = GuiStates.login;
-//	}
-	
-	public void OnLogOut()
-	{
-		this.isAuthenticated = false;
-		this.isJoined = false;
-		this.activeState = GuiStates.login;
-		this.team = string.Empty;
-		this.hideTips = false;
-	}
-	
+#region helper functions
+	/// <summary>
+	/// Provided for resetting the demo state.
+	/// </summary>
 	public void LeaveGame()
 	{
 		this.isAuthenticated = false;
@@ -293,4 +306,4 @@ public class PlayFabIntegration : MonoBehaviour {
 		this.hideTips = false;
 	}
 }
-
+#endregion

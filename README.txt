@@ -46,8 +46,6 @@ Android Device ID: a931f26995380c5a
 Left To Do:
 -------------------------------------------------------------------------------------------------------------------------------------
 + Address Bugs / questions I posted in Asana
-+ Update text on the unity screens to be sufficiently verbose and instructive
-+ Add more comments to C# code
 + Need to document this somewhere:
     Cloud Script Parameter "Args" Object:
     {

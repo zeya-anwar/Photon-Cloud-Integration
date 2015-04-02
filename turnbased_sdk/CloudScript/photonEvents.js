@@ -1,3 +1,14 @@
+/* 
+	Example PlayFab Cloud Script weith examples which correspond to each photon webhook callback:
+		1) RoomCreated
+		2) RoomClosed
+		3) RoomEventRaised
+		4) RoomPropertyUpdated
+		5) RoomJoined
+		6) RoomLeft
+*/
+
+// Called in response to OpCreateRoom calls from the phton turnbased API
 handlers.RoomCreated = function(args)
 {
 	var stats = server.GetUserStatistics({"PlayFabId" : currentPlayerId});
@@ -10,18 +21,21 @@ handlers.RoomCreated = function(args)
 	});	
 }
 
+// Called in response to a game room reaching a full or closed status
 handlers.RoomClosed = function(args)
 {
-	var stats = server.GetUserStatistics({"PlayFabId" : currentPlayerId});
-	var roomClosedEventRaised = parseInt(stats.UserStatistics.roomClosedEventRaised !== undefined ? stats.UserStatistics.roomClosedEventRaised : 0);
+/*  Currently not working. Will be fixing soon. */
+	// var stats = server.GetUserStatistics({"PlayFabId" : currentPlayerId});
+	// var roomClosedEventRaised = parseInt(stats.UserStatistics.roomClosedEventRaised !== undefined ? stats.UserStatistics.roomClosedEventRaised : 0);
 
-	// write player stats to increment event counters
-	server.UpdateUserStatistics({"PlayFabId" : currentPlayerId, "UserStatistics" : {
-		"roomClosedEventRaised" : roomClosedEventRaised + 1,
-		} 
-	});	
+	// // write player stats to increment event counters
+	// server.UpdateUserStatistics({"PlayFabId" : currentPlayerId, "UserStatistics" : {
+	// 	"roomClosedEventRaised" : roomClosedEventRaised + 1,
+	// 	} 
+	//});	
 }
 
+// Called in response to generic OpRaisEvent calls
 handlers.RoomEventRaised = function(args)
 {
     var stats = server.GetUserStatistics({"PlayFabId" : currentPlayerId});
@@ -29,6 +43,7 @@ handlers.RoomEventRaised = function(args)
     {
 		if(args.Data.eventType !== undefined)
 	    {
+	    	// process events with the exp eventType
 	    	if(args.Data.eventType === "exp")
 	    	{
 				// write player stats to increment event counters
@@ -42,6 +57,7 @@ handlers.RoomEventRaised = function(args)
 					} 
 				});	
 	    	}
+	    	// process events with the mvp eventType
 			else if(args.Data.eventType === "mvp")
 			{
 				var mVPsWonCount = parseInt(stats.UserStatistics.MVPsWonCount !== undefined ? stats.UserStatistics.MVPsWonCount : 0);
@@ -65,25 +81,28 @@ handlers.RoomEventRaised = function(args)
 
 }
 
+// Called in response to OpSetCustomPropertiesOfRoom 
 handlers.RoomPropertyUpdated = function(args)
 {
-	var stats = server.GetUserStatistics({"PlayFabId" : currentPlayerId});
-	var roomPropertyUpdatedEventRaised = parseInt(stats.UserStatistics.roomPropertyUpdatedEventRaised !== undefined ? stats.UserStatistics.roomPropertyUpdatedEventRaised : 0);
+/* Currently not working, bug submitted to Photon */ 
+	// var stats = server.GetUserStatistics({"PlayFabId" : currentPlayerId});
+	// var roomPropertyUpdatedEventRaised = parseInt(stats.UserStatistics.roomPropertyUpdatedEventRaised !== undefined ? stats.UserStatistics.roomPropertyUpdatedEventRaised : 0);
 
-	// write player stats to increment event counters
-	server.UpdateUserStatistics({"PlayFabId" : currentPlayerId, "UserStatistics" : {
-		"roomPropertyUpdatedEventRaised" : roomPropertyUpdatedEventRaised + 1,
-		} 
-	});	
+	// // write player stats to increment event counters
+	// server.UpdateUserStatistics({"PlayFabId" : currentPlayerId, "UserStatistics" : {
+	// 	"roomPropertyUpdatedEventRaised" : roomPropertyUpdatedEventRaised + 1,
+	// 	} 
+	// });	
 }
 
+// Called in response to OpJoinRoom
 handlers.RoomJoined = function(args)
 {
 	var stats = server.GetUserStatistics({"PlayFabId" : currentPlayerId});
 	var redTeamJoinedCount = parseInt(stats.UserStatistics.RedTeamJoinedCount !== undefined ? stats.UserStatistics.RedTeamJoinedCount : 0);
 	var bluTeamJoinedCount = parseInt(stats.UserStatistics.BluTeamJoinedCount !== undefined ? stats.UserStatistics.BluTeamJoinedCount : 0);
 
-	// pick a team
+	// randomly pick a team
 	var team = (Math.random() * (100 - 1) + 1) > 50 ? "Red" : "Blu";
 
 	// write player stats to increment event counters
@@ -97,6 +116,7 @@ handlers.RoomJoined = function(args)
 	}
 }
 
+// Called in response to OpLeaveRoom
 handlers.RoomLeft = function(args)
 {
 	var stats = server.GetUserStatistics({"PlayFabId" : currentPlayerId});
