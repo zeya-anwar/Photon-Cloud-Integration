@@ -49,10 +49,10 @@ handlers.helloWorld = function (args) {
 // award the player items from a drop table based on their performance.
 handlers.completedLevel = function (args) {
 
-    // "args" is set to the value of the object passed in as the "Params" field of the object
-    // passed in to RunCloudScript from the client. 
-    // It contains whatever properties you want to pass into your Cloud Script function. 
-    // In this case it contains information about the level a player has completed.
+    // "args" is set to the value of the "Params" field of the object passed in to 
+    // RunCloudScript from the client.  It contains whatever properties you want to pass 
+    // into your Cloud Script function. In this case it contains information about 
+    // the level a player has completed.
     var level = args.levelName;
     var monstersKilled = args.monstersKilled;
 
