@@ -19,7 +19,7 @@
 // (https://api.playfab.com/Documentation/Server). You can invoke the function 
 // from your game client by calling the RunCloudScript API 
 // (https://api.playfab.com/Documentation/Client/method/RunCloudScript) and 
-// specifying "helloWorld" as the ActionId.
+// specifying "helloWorld" for the "ActionId" field.
 handlers.helloWorld = function (args) {
 
     // "currentPlayerId" is initialized to the PlayFab ID of the player logged-in on the game client. 
