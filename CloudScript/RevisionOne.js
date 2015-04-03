@@ -22,7 +22,7 @@
 // specifying "helloWorld" as the ActionId.
 handlers.helloWorld = function (args) {
 
-    // currentPlayerId is automatically set to the PlayFab ID of the player logged-in on the game client. 
+    // currentPlayerId is initialized to the PlayFab ID of the player logged-in on the game client. 
     // Cloud Script handles authenticating the player automatically.
     var message = "Hello " + currentPlayerId + "!";
 
