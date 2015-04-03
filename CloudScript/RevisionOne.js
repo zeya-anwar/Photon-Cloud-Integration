@@ -4,7 +4,7 @@
 // The examples here provide a quick introduction to using Cloud Script and some
 // ideas about how you might use it in your game.
 //
-// Feel free to use this as a starting point for your game server logic, or replace it altogether. 
+// Feel free to use this as a starting point for your game server logic, or to replace it altogether. 
 // If you have any questions or need advice on where to begin, 
 // check out the resources at https://playfab.com/cloud-script or email our 
 // Customer Success team at devrel@playfab.com.
@@ -22,7 +22,7 @@
 // specifying "helloWorld" as the ActionId.
 handlers.helloWorld = function (args) {
 
-    // currentPlayerId is set to the PlayFab ID of the player logged-in on the game client. 
+    // currentPlayerId is automatically set to the PlayFab ID of the player logged-in on the game client. 
     // Cloud Script handles authenticating the player automatically.
     var message = "Hello " + currentPlayerId + "!";
 
