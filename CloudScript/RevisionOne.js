@@ -37,7 +37,14 @@ handlers.helloWorld = function (args) {
     return { messageValue: message };
 }
 
-
+// This is an function that the game client would call whenever a player completes
+// a level. It updates a setting in the player's data that only game server
+// code can write - it is read-only on the client - and it updates a player
+// statistic that can be used for leaderboards. 
+//
+// A funtion like this could be extended to perform validation on the 
+// level completion data to detect cheating. It could also do things like 
+// award the player items from a drop table based on their performance.
 handlers.completedLevel = function (args) {
 
     // args is the object passed in to RunCloudScript from the client. 
