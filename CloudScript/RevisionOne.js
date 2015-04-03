@@ -100,7 +100,8 @@ handlers.updatePlayerMove = function (args) {
 // below.
 function processPlayerMove(playerMove) {
     var now = Date.now();
-
+    var playerMoveCooldownInSeconds = 15;
+    
     var playerData = server.GetUserInternalData({
         PlayFabId: currentPlayerId,
         Keys: ["last_move_timestamp"]
@@ -113,8 +114,8 @@ function processPlayerMove(playerMove) {
         var timeSinceLastMoveInSeconds = (now - lastMoveTime) / 1000;
 	log.debug("lastMoveTime: " + lastMoveTime + " now: " + now + " timeSinceLastMoveInSeconds: " + timeSinceLastMoveInSeconds);
 	
-        if (timeSinceLastMoveInSeconds < 60) {
-            log.error("Invalid move - time since last move: " + timeSinceLastMoveInSeconds + "s.")
+        if (timeSinceLastMoveInSeconds < playerMoveCooldownInSeconds) {
+            log.error("Invalid move - time since last move: " + timeSinceLastMoveInSeconds + "s less than minimum of " + playerMoveCooldownInSeconds + "s.")
             return false;
         }
     }
