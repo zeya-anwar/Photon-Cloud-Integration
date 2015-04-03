@@ -92,6 +92,9 @@ handlers.UpdatePlayerMove = function (args) {
 // This is a helper function that verifies that the player's move wasn't made
 // too quickly following their previous move, according to the rules of the game.
 // If the move is valid, then it updates the player's statistics and profile data.
+// This function is called from the "UpdatePlayerMove" handler above and also is 
+// triggered by the "RoomEventRaised" Photon room event in the Webhook handler
+// below.
 function processPlayerMove(playerMove) {
     var now = Date.now();
 
