@@ -7,7 +7,7 @@
 // Feel free to use this as a starting point for your game server logic, or to replace it altogether. 
 // If you have any questions or need advice on where to begin, 
 // check out the resources at https://playfab.com/cloud-script or email our 
-// Customer Success team at devrel@playfab.com.
+// Developer Success team at devrel@playfab.com.
 //
 // - The PlayFab Team
 //
