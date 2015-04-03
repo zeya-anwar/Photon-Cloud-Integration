@@ -148,6 +148,9 @@ function processPlayerMove(playerMove) {
 
 // Photon Webhooks Integration
 //
+// Note: This is feature is currently in limited access Beta. To request early access
+//       please email beta@playfab.com.
+//
 // The following functions are examples of Photon Cloud Webhook handlers. 
 // When you enable Photon integration in the Game Manager, your Photon applications 
 // are automatically configured to authenticate players using their PlayFab accounts 
