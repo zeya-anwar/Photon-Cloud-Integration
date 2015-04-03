@@ -72,16 +72,15 @@ handlers.completedLevel = function (args) {
 	});
 
     log.debug("Set lastLevelCompleted for player " + currentPlayerId + " to " + level);
-    var statName = level + "_monster_kills";
-
+    
     server.UpdateUserStatistics({
         PlayFabId: currentPlayerId,
         UserStatistics: {
-            statName: monstersKilled
+            level_monster_kills: monstersKilled
         }
     });
 
-    log.debug("Updated " + statName + " stat for player " + currentPlayerId + " to " + monstersKilled);
+    log.debug("Updated level_monster_kills stat for player " + currentPlayerId + " to " + monstersKilled);
 }
 
 
