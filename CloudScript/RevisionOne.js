@@ -15,7 +15,7 @@
 
 
 // This is a Cloud Script handler function. It runs in the PlayFab cloud and 
-// has full access to the PlayFab GameServer API 
+// has full access to the PlayFab Game Server API 
 // (https://api.playfab.com/Documentation/Server). You can invoke the function 
 // from your game client by calling the RunCloudScript API 
 // (https://api.playfab.com/Documentation/Client/method/RunCloudScript) and 
