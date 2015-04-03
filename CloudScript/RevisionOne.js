@@ -111,7 +111,7 @@ function processPlayerMove(playerMove) {
     if (lastMoveTimestampSetting) {
         var lastMoveTime = Date.parse(lastMoveTimestampSetting.Value);
         var timeSinceLastMoveInSeconds = (now - lastMoveTime) / 1000;
-	log.debug("lastMoveTime: " + lastMoveTime + " now: " + now + "timeSinceLastMoveInSeconds: " + timeSinceLastMoveInSeconds);
+	log.debug("lastMoveTime: " + lastMoveTime + " now: " + now + " timeSinceLastMoveInSeconds: " + timeSinceLastMoveInSeconds);
 	
         if (timeSinceLastMoveInSeconds < 60) {
             log.error("Invalid move - time since last move: " + timeSinceLastMoveInSeconds + "s.")
