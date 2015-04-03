@@ -144,7 +144,7 @@ function processPlayerMove(playerMove) {
 }
 
 
-//
+
 // Photon Webhooks Integration
 //
 // The following functions are examples of Photon Cloud Webhook handlers. 
@@ -154,7 +154,7 @@ function processPlayerMove(playerMove) {
 // This makes it easier than ever to incorporate server logic into your game.
 //
 //  For more information, see https://playfab.com/using-photon-playfab
-//
+
 
 // Triggered automatically when a Photon room is first created
 handlers.RoomCreated = function (args) {
