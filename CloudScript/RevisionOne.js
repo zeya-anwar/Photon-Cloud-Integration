@@ -86,7 +86,7 @@ handlers.completedLevel = function (args) {
 
 // In addition to the Cloud Script handlers, you can define your own functions and call them from your handlers. 
 // This makes it possible to share code between multiple handlers and to improve code organization.
-handlers.UpdatePlayerMove = function (args) {
+handlers.updatePlayerMove = function (args) {
     var validMove = processPlayerMove(args);
     return { validMove: validMove };
 }
