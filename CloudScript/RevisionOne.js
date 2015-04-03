@@ -162,7 +162,7 @@ handlers.RoomClosed = function (args) {
     log.debug("Room Closed - Game: " + args.GameId);
 }
 
-// Triggered by calling OpRaiseEvent on the Photon client. The args.Data is 
+// Triggered by calling OpRaiseEvent on the Photon client. The args.Data property is 
 // set to the value of the customEventContent HashTable parameter, so you can use
 // it to pass in arbitrary data.
 handlers.RoomEventRaised = function (args) {
