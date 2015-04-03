@@ -88,6 +88,10 @@ handlers.UpdatePlayerMove = function (args) {
     return { validMove: validMove };
 }
 
+
+// This is a helper function that verifies that the player's move wasn't made
+// too quickly following their previous move, according to the rules of the game.
+// If the move is valid, then it updates the player's statistics and profile data.
 function processPlayerMove(playerMove) {
     var now = Date.now();
 
