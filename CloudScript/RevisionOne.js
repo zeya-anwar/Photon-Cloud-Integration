@@ -106,10 +106,10 @@ function processPlayerMove(playerMove) {
         Keys: ["last_move_timestamp"]
     });
 
-    var lastMoveTimestamp = playerData.Data["last_move_timestamp"];
+    var lastMoveTimestampSetting = playerData.Data["last_move_timestamp"];
 
-    if (lastMoveTimestamp) {
-        var lastMoveTime = Date.parse(lastMoveTimestamp);
+    if (lastMoveTimestampSetting) {
+        var lastMoveTime = Date.parse(lastMoveTimestampSetting.Value);
         var timeSinceLastMoveInSeconds = (now - lastMoveTime) / 1000;
 	log.debug("lastMoveTime: " + lastMoveTime + " now: " + now + "timeSinceLastMoveInSeconds: " + timeSinceLastMoveInSeconds);
 	
