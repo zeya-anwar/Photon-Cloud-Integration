@@ -64,7 +64,7 @@ handlers.completedLevel = function (args) {
     // The "server" object has functions for each PlayFab server API 
     // (https://api.playfab.com/Documentation/Server). It is automatically 
     // authenticated as your title and handles all communication with 
-    // the PlayFab API, so you don’t have to write the code to make web requests. 
+    // the PlayFab API, so you don't have to write the code to make web requests. 
     var updateUserDataResult = server.UpdateUserInternalData({
 	    PlayFabId: currentPlayerId,
 	    Data: {
