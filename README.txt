@@ -1,6 +1,8 @@
 README for PlayFab / Photon Integration for Custom Authentication and Webhooks
 =====================================================================================================================================
 
+NOTE: The PlayFab/Photon integration is currently in limited beta ahead of our full release. To sign up for the waiting list for access to the beta, please email beta@playfab.com.
+
 Overview:
 -------------------------------------------------------------------------------------------------------------------------------------
 This project uses the Photon Cloud Turnbased plugin and demo to illustrate how functions in the PlayFab cloud script environment can be called automatically from the Photon Turn Based web hooks service. This is a powerful combination of convenience and flexibility that can give your title event-driven game logic running in a secured cloud environment with access the the entire PlayFab Client and Server API set.
