@@ -3,7 +3,7 @@ README for PlayFab / Photon Integration for Custom Authentication and Webhooks
 
 Overview:
 -------------------------------------------------------------------------------------------------------------------------------------
-This project uses the Photon Cloud Turnbased plugin and demo to illustrate how functions in the PlayFab cloud script environment can be called automatically from the Photon Turn Based web hooks service. This is a powerful combination of convenience and flexibility that can give your title event-driven game logic running in a secured cloud environment with access the the entire PlayFab Client and Server API set.
+This project uses the Photon Cloud Turn Based plugin and demo to illustrate how functions in the PlayFab cloud script environment can be called automatically from the Photon Turn Based web hooks service. This is a powerful combination of convenience and flexibility that can give your title event-driven game logic running in a secured cloud environment with access the the entire PlayFab Client and Server API set.
 
 The demo (DemoFriends-Scene provides) provides a simple and straightforward approach to getting your events working. We added a PlayFabIntegration.cs class to the Scripts GameObject, a component which contains our examples. 
 
