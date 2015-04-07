@@ -84,7 +84,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
 
                 if (value != this.isOpen)
                 {
-                    LoadBalancingClient.OpSetPropertiesOfRoom(new Hashtable() { { GamePropertyKey.IsOpen, value } });
+                    LoadBalancingClient.OpSetPropertiesOfRoom(new Hashtable() { { GamePropertyKey.IsOpen, value } }, true);
                 }
 
                 this.isOpen = value;
@@ -116,7 +116,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
 
                 if (value != this.isVisible)
                 {
-                    LoadBalancingClient.OpSetPropertiesOfRoom(new Hashtable() { { GamePropertyKey.IsVisible, value } });
+                    LoadBalancingClient.OpSetPropertiesOfRoom(new Hashtable() { { GamePropertyKey.IsVisible, value } }, true);
                 }
 
                 this.isVisible = value;
@@ -147,7 +147,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
 
                 if (value != this.maxPlayers)
                 {
-                    LoadBalancingClient.OpSetPropertiesOfRoom(new Hashtable() { { GamePropertyKey.MaxPlayers, value } });
+                    LoadBalancingClient.OpSetPropertiesOfRoom(new Hashtable() { { GamePropertyKey.MaxPlayers, value } }, true);
                 }
 
                 this.maxPlayers = value;
@@ -282,7 +282,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
             // send (sync) these new values if in room
             if (this.IsLocalClientInside)
             {
-                this.LoadBalancingClient.OpSetCustomPropertiesOfRoom(customProps);
+                this.LoadBalancingClient.OpSetCustomPropertiesOfRoom(customProps, true);
             }
         }
 
@@ -298,7 +298,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
             Hashtable customProps = new Hashtable();
             customProps[GamePropertyKey.PropsListedInLobby] = propsToListInLobby;
 
-            bool sent = this.LoadBalancingClient.OpSetPropertiesOfRoom(customProps);
+            bool sent = this.LoadBalancingClient.OpSetPropertiesOfRoom(customProps, true);
             if (sent)
             {
                 this.propsListedInLobby = propsToListInLobby;
