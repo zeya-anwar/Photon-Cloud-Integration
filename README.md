@@ -2,7 +2,7 @@ PlayFab / Photon (Turnbased) Integration for Custom Authentication and Webhooks
 ========
 1. Overview:
 ----
-This project uses the Photon Cloud Turn Based plugin and demo to illustrate how functions in the PlayFab cloud script environment can be called automatically from the Photon Turn Based web hooks service. This is a powerful combination of convenience and flexibility that can give your title event-driven game logic running in a secured cloud environment with access the the entire PlayFab Client and Server API set.
+This project uses the Photon Cloud Turnbased plugin and demo to illustrate how functions in the PlayFab cloud script environment can be called automatically via Photon Cloud webhooks. This is a powerful combination of convenience and flexibility that can give your title event-driven game logic running in a secured cloud environment with access the the entire PlayFab Server API set.
 
 The demo (DemoFriends-Scene provides) provides a simple and straightforward approach to getting your events working. We added a PlayFabIntegration.cs class to the Scripts GameObject, a component which contains our examples. 
 
@@ -17,13 +17,13 @@ There are several factors which must be in place before triggering your web hook
 * Photon: You must activate the Photon capabilities on your title. This can be done by visiting  "PlayFab game manager > Servers > Photon"
 
 ##### Credentials: 
-* PlayFab Title Id: this is the id of the PlayFab game in use, and can be found at the top of PlayFabIntegration.cs. It defaults to the demo script id "FD3A"
+* PlayFab Title ID: this is the id of the PlayFab game in use, and can be found at the top of PlayFabIntegration.cs. It defaults to the demo script id "FD3A"
 * PlayFab Authentication: For this example we are using a testing account tied to a testing device. You will want to change this if you wish authenticate with your own users.
-  * PlayFab User Id: Obtained after authentication, provided to the Photon SDK for CustomAuthentication. 
+  * PlayFab User ID: Obtained after authentication, provided to the Photon SDK for CustomAuthentication. 
   * PlayFab Authentication Ticket: Obtained after authentication, provided to the Photon SDK for CustomAuthentication.
-* Photon App Id: A GUID that uniquely defines your title. This can be found by visiting "PlayFab game manager > Servers > Photon" and should be saved into the Photon Setup Wizard
+* Photon App ID: A GUID that uniquely defines your title. This can be found by visiting "PlayFab game manager > Servers > Photon" and should be saved into the Photon Setup Wizard
 
-Once you have these factors in place, you are ready to web hook. 
+Once you have these factors in place, you are ready to use webhooks.
 
 3. Source Code & Key Repository Components:
 ----
@@ -42,7 +42,7 @@ Open with Unity3d, Play in the editor or Build to PC / Mac / Web.
 3) Enter a nickname and click the button to to begin
 4) Starting here we are loading in our example code from PlayFabIntegration.cs
 5) Follow the on screen prompts to experience the game flow to trigger events which fire webhooks
-6) On the game view, you can hide the prompts by clicking the button (these will reappear after leaving the game.
+6) On the game view, you can hide the prompts by clicking the button (these will reappear after leaving the game).
 
 6. Troubleshooting:
 ----
@@ -54,7 +54,7 @@ Do you have ideas on how we can make our products and services better?
 
 Our Developer Success Team can assist with answering any questions as well as process any feedback you have about PlayFab services.
 
-[Forums, Support and Knowlage Base](https://support.playfab.com/support/home)
+[Forums, Support and Knowledge Base](https://support.playfab.com/support/home)
 
 
 7. Copyright and Licensing Information:
