@@ -66,14 +66,14 @@ handlers.completedLevel = function (args) {
     // authenticated as your title and handles all communication with 
     // the PlayFab API, so you don't have to write the code to make web requests. 
     var updateUserDataResult = server.UpdateUserInternalData({
-	    PlayFabId: currentPlayerId,
-	    Data: {
-	        lastLevelCompleted: level
-	    }
-	});
+        PlayFabId: currentPlayerId,
+        Data: {
+            lastLevelCompleted: level
+        }
+    });
 
     log.debug("Set lastLevelCompleted for player " + currentPlayerId + " to " + level);
-    
+
     server.UpdateUserStatistics({
         PlayFabId: currentPlayerId,
         UserStatistics: {
@@ -107,7 +107,7 @@ handlers.updatePlayerMove = function (args) {
 function processPlayerMove(playerMove) {
     var now = Date.now();
     var playerMoveCooldownInSeconds = 15;
-    
+
     var playerData = server.GetUserInternalData({
         PlayFabId: currentPlayerId,
         Keys: ["last_move_timestamp"]
@@ -118,8 +118,8 @@ function processPlayerMove(playerMove) {
     if (lastMoveTimestampSetting) {
         var lastMoveTime = Date.parse(lastMoveTimestampSetting.Value);
         var timeSinceLastMoveInSeconds = (now - lastMoveTime) / 1000;
-	log.debug("lastMoveTime: " + lastMoveTime + " now: " + now + " timeSinceLastMoveInSeconds: " + timeSinceLastMoveInSeconds);
-	
+        log.debug("lastMoveTime: " + lastMoveTime + " now: " + now + " timeSinceLastMoveInSeconds: " + timeSinceLastMoveInSeconds);
+
         if (timeSinceLastMoveInSeconds < playerMoveCooldownInSeconds) {
             log.error("Invalid move - time since last move: " + timeSinceLastMoveInSeconds + "s less than minimum of " + playerMoveCooldownInSeconds + "s.")
             return false;
@@ -150,12 +150,7 @@ function processPlayerMove(playerMove) {
     return true;
 }
 
-
-
 // Photon Webhooks Integration
-//
-// Note (April 2015): This is feature is currently in limited access Beta. To request early
-//       access please email beta@playfab.com.
 //
 // The following functions are examples of Photon Cloud Webhook handlers. 
 // When you enable Photon integration in the Game Manager, your Photon applications 
@@ -182,8 +177,15 @@ handlers.RoomLeft = function (args) {
 }
 
 // Triggered automatically when a Photon room closes
+// Note: currentPlayerId is undefined in this function
 handlers.RoomClosed = function (args) {
     log.debug("Room Closed - Game: " + args.GameId);
+}
+
+// Triggered automatically when a Photon room game property is updated.
+// Note: currentPlayerId is undefined in this function
+handlers.RoomPropertyUpdated = function (args) {
+    log.debug("Room Property Updated - Game: " + args.GameId);
 }
 
 // Triggered by calling "OpRaiseEvent" on the Photon client. The "args.Data" property is 
