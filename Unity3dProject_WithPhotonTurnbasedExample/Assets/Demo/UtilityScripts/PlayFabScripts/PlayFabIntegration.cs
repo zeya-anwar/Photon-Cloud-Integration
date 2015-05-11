@@ -222,6 +222,7 @@ public class PlayFabIntegration : MonoBehaviour {
 	// callback on successful LoginToPlayFab request 
 	void OnLoginSuccess(LoginResult result)
 	{
+		Debug.Log(result.PlayFabId);
 		StartCoroutine(GetUserStats());
 		this.playfabId = result.PlayFabId;
 		GetPhotonAuthenticationTokenRequest request = new GetPhotonAuthenticationTokenRequest();
@@ -233,7 +234,6 @@ public class PlayFabIntegration : MonoBehaviour {
 	// callback on successful GetPhotonAuthenticationToken request 
 	void OnPhotonAuthenticationSuccess(GetPhotonAuthenticationTokenResult result)
 	{
-		//Debug.Log (string.Format("pfid:{0}, photon:{1}", this.playfabId, result.PhotonCustomAuthenticationToken));
 		photonComponent.ConnectToMasterServer(this.playfabId, result.PhotonCustomAuthenticationToken);
 	}
 	

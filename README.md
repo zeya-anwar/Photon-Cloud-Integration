@@ -25,6 +25,11 @@ There are several factors which must be in place before triggering your web hook
 
 Once you have these factors in place, you are ready to use webhooks.
 
+To connect to the PlayFab service, your machine must be running TLS v1.1 or better.
+* For Windows, this means Windows 7 and above
+* [Official Microsoft Documentation](https://msdn.microsoft.com/en-us/library/windows/desktop/aa380516%28v=vs.85%29.aspx)
+* [Support for SSL/TLS protocols on Windows](http://blogs.msdn.com/b/kaushal/archive/2011/10/02/support-for-ssl-tls-protocols-on-windows.aspx)
+
 3. Source Code & Key Repository Components:
 ----
 * Repo/Unity3dProject_WithPhotonTurnbasedExample -- contains Photon's example project, with modifications to illustrate how PlayFab custom authentication can be used in conjunction with Photon. 
