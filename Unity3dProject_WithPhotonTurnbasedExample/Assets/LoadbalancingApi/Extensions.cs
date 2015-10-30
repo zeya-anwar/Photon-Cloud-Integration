@@ -5,14 +5,14 @@
 // <summary>
 //   Provides some helpful methods and extensions for Hashtables, etc.
 // </summary>
-// <author>developer@exitgames.com</author>
+// <author>developer@photonengine.com</author>
 // ----------------------------------------------------------------------------
 
 namespace ExitGames.Client.Photon.LoadBalancing
 {
     using System.Collections;
 
-#if UNITY_EDITOR || UNITY_STANDALONE_OSX || UNITY_DASHBOARD_WIDGET || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX || UNITY_STANDALONE || UNITY_WEBPLAYER || UNITY_WII || UNITY_IPHONE || UNITY_ANDROID || UNITY_PS3 || UNITY_XBOX360 || UNITY_NACL  || UNITY_FLASH  || UNITY_BLACKBERRY
+#if UNITY_EDITOR || UNITY_STANDALONE_OSX || UNITY_DASHBOARD_WIDGET || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX || UNITY_STANDALONE || UNITY_WEBPLAYER || UNITY_WII || UNITY_IPHONE || UNITY_ANDROID || UNITY_PS3 || UNITY_XBOX360 || UNITY_NACL  || UNITY_FLASH  || UNITY_BLACKBERRY || UNITY_PSP2 || UNITY_WEBGL
     using Hashtable = ExitGames.Client.Photon.Hashtable;
 #endif
 
@@ -65,7 +65,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
         /// This method copies all string-typed keys of the original into a new Hashtable.
         /// </summary>
         /// <remarks>
-        /// Does not recurse (!) into hashes that might be values in the root-hash. 
+        /// Does not recurse (!) into hashes that might be values in the root-hash.
         /// This does not modify the original.
         /// </remarks>
         /// <param name="original">The original IDictonary to get string-typed keys from.</param>

@@ -6,8 +6,9 @@
 //   Provides the operations and a state for games using the
 //   Photon LoadBalancing server.
 // </summary>
-// <author>developer@exitgames.com</author>
+// <author>developer@photonengine.com</author>
 // ----------------------------------------------------------------------------
+
 
 namespace ExitGames.Client.Photon.LoadBalancing
 {
@@ -15,8 +16,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
     using System.Collections;
     using System.Collections.Generic;
     using System.Diagnostics;
-
-#if UNITY_EDITOR || UNITY_STANDALONE_OSX || UNITY_DASHBOARD_WIDGET || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX || UNITY_STANDALONE || UNITY_WEBPLAYER || UNITY_WII || UNITY_IPHONE || UNITY_ANDROID || UNITY_PS3 || UNITY_XBOX360 || UNITY_NACL  || UNITY_FLASH  || UNITY_BLACKBERRY
+#if UNITY_EDITOR || UNITY_STANDALONE_OSX || UNITY_DASHBOARD_WIDGET || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX || UNITY_STANDALONE || UNITY_WEBPLAYER || UNITY_WII || UNITY_IPHONE || UNITY_ANDROID || UNITY_PS3 || UNITY_XBOX360 || UNITY_NACL  || UNITY_FLASH  || UNITY_BLACKBERRY || UNITY_PSP2 || UNITY_WEBGL
     using Hashtable = ExitGames.Client.Photon.Hashtable;
 #endif
 
@@ -141,20 +141,34 @@ namespace ExitGames.Client.Photon.LoadBalancing
         /// <summary>The AppID as assigned from the Photon Cloud. If you host yourself, this is the "regular" Photon Server Application Name (most likely: "LoadBalancing").</summary>
         public string AppId { get; set; }
 
-        /// <summary>A user's authentication values used during connect for Custom Authentication with Photon.</summary>
-        /// <remarks>Set this property or pass AuthenticationValues by Connect(..., authValues) for custom authentication.</remarks>
-        public AuthenticationValues CustomAuthenticationValues { get; set; }
+        /// <summary>A user's authentication values for authentication in Photon.</summary>
+        /// <remarks>Set this property or pass AuthenticationValues by Connect(..., authValues).</remarks>
+        public AuthenticationValues AuthValues { get; set; }
 
         /// <summary>True if this client uses a NameServer to get the Master Server address.</summary>
         public bool IsUsingNameServer { get; private set; }
 
-        /// <summary>Name Server Address that this client uses. You can use the default values and usually won't have to set this value.</summary>
-        public string NameServerAddress = "ns.exitgamescloud.com:5058";
+        /// <summary>Name Server Host Name for Photon Cloud. Without port and without any prefix.</summary>
+        public string NameServerHost = "ns.exitgames.com";
+
+        /// <summary>Name Server for HTTP connections to the Photon Cloud. Includes prefix and port.</summary>
+        public string NameServerHttp = "http://ns.exitgames.com:80/photon/n";
+
+        /// <summary>Name Server port per protocol (the UDP port is different than TCP, etc).</summary>
+        private static readonly Dictionary<ConnectionProtocol, int> ProtocolToNameServerPort = new Dictionary<ConnectionProtocol, int>() { { ConnectionProtocol.Udp, 5058 }, { ConnectionProtocol.Tcp, 4533 }, { ConnectionProtocol.WebSocket, 9093 }, { ConnectionProtocol.WebSocketSecure, 19093 } }; //, { ConnectionProtocol.RHttp, 6063 } };
+
+        /// <summary>Name Server Address for Photon Cloud (based on current protocol). You can use the default values and usually won't have to set this value.</summary>
+        public string NameServerAddress { get { return this.GetNameServerAddress(); } }
 
         /// <summary>The currently used server address (if any). The type of server is define by Server property.</summary>
         public string CurrentServerAddress { get { return this.loadBalancingPeer.ServerAddress; } }
 
-        /// <summary>The master server's address. Defaults to "app-eu.exitgamescloud.com:5055". Can be changed before call of Connect.</summary>
+
+        /// <summary>Your Master Server address. In PhotonCloud, call ConnectToRegionMaster() to find your Master Server.</summary>
+        /// <remarks>
+        /// In the Photon Cloud, explicit definition of a Master Server Address is not best practice.
+        /// The Photon Cloud has a "Name Server" which redirects clients to a specific Master Server (per Region and AppId).
+        /// </remarks>
         public string MasterServerAddress { get; internal protected set; }
 
         /// <summary>The game server's address for a particular room. In use temporarily, as assigned by master.</summary>
@@ -169,6 +183,9 @@ namespace ExitGames.Client.Photon.LoadBalancing
         }
 
         /// <summary>The server this client is currently connected or connecting to.</summary>
+        /// <remarks>
+        /// Each server (NameServer, MasterServer, GameServer) allow some operations and reject others.
+        /// </remarks>
         public ServerConnection Server { get; private set; }
 
         /// <summary>Backing field for property.</summary>
@@ -195,8 +212,13 @@ namespace ExitGames.Client.Photon.LoadBalancing
 
 
         /// <summary>
-        /// A refined version of connected which is true only if your connection to the server is ready to accept operations like join, leave, etc.
+        /// A refined version of IsConnected which is true only if your connection to the server is ready to accept operations.
         /// </summary>
+        /// <remarks>
+        /// Which operations are available, depends on the Server. For example, the NameServer allows OpGetRegions which is not available anywhere else.
+        /// The MasterServer does not allow you to send events (OpRaiseEvent) and on the GameServer you are unable to join a lobby (OpJoinLobby).
+        /// Check which server you are on with PhotonNetwork.Server.
+        /// </remarks>
         public bool IsConnectedAndReady
         {
             get
@@ -224,7 +246,29 @@ namespace ExitGames.Client.Photon.LoadBalancing
             }
         }
 
+        /// <summary>Register a method to be called when this client's ClientState gets set.</summary>
+        /// <remarks>This can be useful to react to being connected, joined into a room, etc.</remarks>
         public Action<ClientState> OnStateChangeAction { get; set; }
+
+        /// <summary>Register a method to be called when an event got dispatched. Gets called at the end of OnEvent().</summary>
+        /// <remarks>
+        /// This is an alternative to extending LoadBalancingClient to override OnEvent().
+        ///
+        /// Note that OnEvent is executing before your Action is called.
+        /// That means for example: Joining players will already be in the player list but leaving
+        /// players will already be removed from the room.
+        /// </remarks>
+        public Action<EventData> OnEventAction { get; set; }
+
+        /// <summary>Register a method to be called when this client's ClientState gets set.</summary>
+        /// <remarks>
+        /// This is an alternative to extending LoadBalancingClient to override OnOperationResponse().
+        ///
+        /// Note that OnOperationResponse gets executed before your Action is called.
+        /// That means for example: The OpJoinLobby response already set the state to "JoinedLobby"
+        /// and the response to OpLeave already triggered the Disconnect before this is called.
+        /// </remarks>
+        public Action<OperationResponse> OnOpResponseAction { get; set; }
 
         /// <summary>Summarizes (aggregates) the different causes for disconnects of a client.</summary>
         /// <remarks>
@@ -235,7 +279,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
         /// state value which can be used to display (or debug) the cause for disconnection.
         /// </remarks>
         public DisconnectCause DisconnectedCause { get; protected set; }
-        
+
         /// <summary>The lobby this client currently uses.</summary>
         public TypedLobby CurrentLobby { get; protected internal set; }
 
@@ -267,13 +311,71 @@ namespace ExitGames.Client.Photon.LoadBalancing
         }
 
         /// <summary>
-        /// Same as client.LocalPlayer.Name
+        /// If set to true, the Master Server will report the list of used lobbies to the client. This sets and updates LobbyStatistics.
         /// </summary>
+        /// <remarks>
+        /// Lobby Statistics can be useful if a game uses multiple lobbies and you want
+        /// to show activity of each to players.
+        ///
+        /// LobbyStatistics are updated when you connect to the Master Server.
+        /// </remarks>
+        public bool EnableLobbyStatistics;
+
+        /// <summary>Internally used as easy check if we should request lobby statistics from "this" particular server.</summary>
+        private bool requestLobbyStatistics
+        {
+            get { return EnableLobbyStatistics && this.Server == ServerConnection.MasterServer; }
+        }
+
+        private List<TypedLobbyInfo> lobbyStatistics = new List<TypedLobbyInfo>();
+
+        /// <summary>
+        /// If RequestLobbyStatistics is true, this provides a list of used lobbies (their name, type, room- and player-count) of this application, while on the Master Server.
+        /// </summary>
+        /// <remarks>
+        /// If turned on, the Master Server will provide information about active lobbies for this application.
+        /// 
+        /// Lobby Statistics can be useful if a game uses multiple lobbies and you want
+        /// to show activity of each to players. Per lobby, you get: name, type, room- and player-count.
+        ///
+        /// Lobby Statistics are not turned on by default.
+        /// Enable them by setting RequestLobbyStatistics to true before you connect.
+        ///
+        /// LobbyStatistics are updated when you connect to the Master Server.
+        /// You can check in OnEvent if EventCode.LobbyStats arrived. This the updates.
+        /// </remarks>
+        public List<TypedLobbyInfo> LobbyStatistics
+        {
+            get { return lobbyStatistics; }
+            private set { lobbyStatistics = value; }
+        }
+
+
+        /// <summary>
+        /// Same as NickName.
+        /// </summary>
+        [Obsolete("Use NickName instead.")]
         public string PlayerName
         {
             get
             {
-                return this.LocalPlayer.Name;
+                return this.NickName;
+            }
+
+            set
+            {
+                this.NickName = value;
+            }
+        }
+
+        /// <summary>
+        /// The nickname of the player (synced with others). Same as client.LocalPlayer.NickName.
+        /// </summary>
+        public string NickName
+        {
+            get
+            {
+                return this.LocalPlayer.NickName;
             }
 
             set
@@ -283,43 +385,58 @@ namespace ExitGames.Client.Photon.LoadBalancing
                     return;
                 }
 
-                this.LocalPlayer.Name = value;
+                this.LocalPlayer.NickName = value;
             }
         }
 
         /// <summary>An ID for this user. Sent in OpAuthenticate when you connect. If not set, the PlayerName is applied during connect.</summary>
         /// <remarks>
-        /// On connect, if the UserId is null or empty, the client will copy the PlayName to UserId. If PlayerName is not set either 
+        /// On connect, if the UserId is null or empty, the client will copy the PlayName to UserId. If PlayerName is not set either
         /// (before connect), the server applies a temporary ID which stays unknown to this client and other clients.
-        /// 
+        ///
         /// The UserId is what's used in FindFriends and for fetching data for your account (with WebHooks e.g.).
-        /// 
-        /// By convention, set this ID before you connect, not while being connected. 
+        ///
+        /// By convention, set this ID before you connect, not while being connected.
         /// There is no error but the ID won't change while being connected.
         /// </remarks>
-        public string UserId { get; set; }
+        public string UserId {
+            get
+            {
+                if (this.AuthValues != null)
+                {
+                    return this.AuthValues.UserId;
+                }
+                return null;
+            }
+            set
+            {
+                if (this.AuthValues == null)
+                {
+                    this.AuthValues = new AuthenticationValues();
+                }
+                this.AuthValues.UserId = value;
+            }
+        }
 
         /// <summary>This "list" is populated while being in the lobby of the Master. It contains RoomInfo per roomName (keys).</summary>
         public Dictionary<string, RoomInfo> RoomInfoList = new Dictionary<string, RoomInfo>();
 
         /// <summary>The current room this client is connected to (null if none available).</summary>
         public Room CurrentRoom;
-
-        private RoomOptions createRoomOptions; // kept for game server call with same parameters
-
+        
         /// <summary>Private field for LocalPlayer.</summary>
         private Player localPlayer;
 
         /// <summary>The local player is never null but not valid unless the client is in a room, too. The ID will be -1 outside of rooms.</summary>
-        public Player LocalPlayer 
-        { 
-            get 
+        public Player LocalPlayer
+        {
+            get
             {
                 if (localPlayer == null)
                 {
                     this.localPlayer = this.CreatePlayer(string.Empty, -1, true, null);
                 }
-                
+
                 return this.localPlayer;
             }
 
@@ -340,10 +457,9 @@ namespace ExitGames.Client.Photon.LoadBalancing
 
         /// <summary>Internally used to decide if a room must be created or joined on game server.</summary>
         private JoinType lastJoinType;
-
-        /// <summary>Internally used in OpJoin to store the actorNumber this client wants to claim in the room.</summary>
-        private int lastJoinActorNumber;
         
+        private LoadBalancingPeer.EnterRoomParams enterRoomParamsCache;
+
         /// <summary>Internally used to trigger OpAuthenticate when encryption was established after a connect.</summary>
         private bool didAuthenticate;
 
@@ -377,7 +493,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
         {
             get
             {
-                return this.CustomAuthenticationValues != null && !string.IsNullOrEmpty(this.CustomAuthenticationValues.Secret);
+                return this.AuthValues != null && !string.IsNullOrEmpty(this.AuthValues.Token);
             }
         }
 
@@ -392,65 +508,61 @@ namespace ExitGames.Client.Photon.LoadBalancing
         /// <summary>The cloud region this client connects to. Set by ConnectToRegionMaster(). Not set if you don't use a NameServer!</summary>
         public string CloudRegion { get; private set; }
 
-
         public LoadBalancingClient(ConnectionProtocol protocol = ConnectionProtocol.Udp)
         {
-            this.MasterServerAddress = "app-eu.exitgamescloud.com:5055";
+            #if UNITY_WEBGL
+            UnityEngine.Debug.Log("LoadBalancingClient using a new WebSocket LoadBalancingPeer and SocketWebTcp.");
+            protocol = ConnectionProtocol.WebSocketSecure;
+            #endif
+
             this.loadBalancingPeer = new LoadBalancingPeer(this, protocol);
+
+            #if UNITY_WEBGL
+            if (protocol == ConnectionProtocol.WebSocket || protocol == ConnectionProtocol.WebSocketSecure) {
+                this.loadBalancingPeer.SocketImplementation = typeof(SocketWebTcp);
+            }
+            #endif
         }
 
-        public LoadBalancingClient(string masterAddress, string appId, string gameVersion, ConnectionProtocol protocol = ConnectionProtocol.Udp)
-            : this(protocol)
+        public LoadBalancingClient(string masterAddress, string appId, string gameVersion, ConnectionProtocol protocol = ConnectionProtocol.Udp) : this(protocol)
         {
             this.MasterServerAddress = masterAddress;
             this.AppId = appId;
             this.AppVersion = gameVersion;
         }
 
+        /// <summary>
+        /// Gets the NameServer Address (with prefix and port), based on the set protocol (this.loadBalancingPeer.UsedProtocol).
+        /// </summary>
+        /// <returns>NameServer Address (with prefix and port).</returns>
+        private string GetNameServerAddress()
+        {
+            ConnectionProtocol currentProtocol = this.loadBalancingPeer.UsedProtocol;
+
+            #if RHTTP
+            if (currentProtocol == ConnectionProtocol.RHttp)
+            {
+                return NameServerHttp;
+            }
+            #endif
+
+            int protocolPort = 0;
+            ProtocolToNameServerPort.TryGetValue(currentProtocol, out protocolPort);
+
+            string protocolPrefix = string.Empty;
+            if (currentProtocol == ConnectionProtocol.WebSocket)
+            {
+                protocolPrefix = "ws://";
+            }
+            else if (currentProtocol == ConnectionProtocol.WebSocketSecure)
+            {
+                protocolPrefix = "wss://";
+            }
+
+            return string.Format("{0}{1}:{2}", protocolPrefix, NameServerHost, protocolPort);
+        }
+
         #region Operations and Commands
-
-        /// \deprecated Use one of the Connect overloads instead.
-        /// <summary>
-        /// Starts the "process" to connect to the master server (initial connect).
-        /// This includes connecting, establishing encryption, authentification and joining a lobby (if AutoJoinLobby is true).
-        /// </summary>
-        /// <param name="appId">Your application's name or ID assigned by Photon Cloud (webpage).</param>
-        /// <param name="appVersion">The client's version (clients with differing client appVersions are separated and players don't meet).</param>
-        /// <param name="playerName">This player's name.</param>
-        /// <returns>If the operation could be send.</returns>
-        [Obsolete("Use one of the Connect overloads instead.")]
-        public bool ConnectToMaster(string appId, string appVersion, string playerName)
-        {
-            this.AppId = appId;
-            this.AppVersion = appVersion;
-            this.PlayerName = playerName;
-
-            return Connect();
-        }
-
-        /// \deprecated Use one of the alternative overloads instead.
-        /// <summary>
-        /// Starts the "process" to connect to the master server (initial connect).
-        /// This includes connecting, establishing encryption, authentification and joining a lobby (if AutoJoinLobby is true).
-        /// </summary>
-        /// <remarks>
-        /// To connect to the Photon Cloud, a valid AppId must be provided. This is shown in the Photon Cloud Dashboard.
-        /// https://cloud.exitgames.com/dashboard
-        /// Connecting to the Photon Cloud might fail due to:
-        /// - Network issues (OnStatusChanged() StatusCode.ExceptionOnConnect)
-        /// - Region not available (OnOperationResponse() for OpAuthenticate with ReturnCode == ErrorCode.InvalidRegion)
-        /// - Subscription CCU limit reached (OnOperationResponse() for OpAuthenticate with ReturnCode == ErrorCode.MaxCcuReached)
-        /// More about the connection limitations:
-        /// http://doc.exitgames.com/photon-cloud/SubscriptionErrorCases/#cat-references
-        /// </remarks>
-        [Obsolete("Use the alternative overloads instead.")]
-        public bool Connect(string serverAddress, string appId)
-        {
-            this.MasterServerAddress = serverAddress;
-            this.AppId = appId;
-
-            return this.Connect();
-        }
 
         /// <summary>
         /// Starts the "process" to connect to the master server. Relevant connection-values parameters can be set via parameters.
@@ -464,28 +576,28 @@ namespace ExitGames.Client.Photon.LoadBalancing
         /// Users can connect either anonymously or use "Custom Authentication" to verify each individual player's login.
         /// Custom Authentication in Photon uses external services and communities to verify users. While the client provides a user's info,
         /// the service setup is done in the Photon Cloud Dashboard.
-        /// The parameter authValues will set this.CustomAuthenticationValues and use them in the connect process.
+        /// The parameter authValues will set this.AuthValues and use them in the connect process.
         ///
         /// To connect to the Photon Cloud, a valid AppId must be provided. This is shown in the Photon Cloud Dashboard.
-        /// https://cloud.exitgames.com/dashboard
+        /// https://cloud.photonengine.com/dashboard
         /// Connecting to the Photon Cloud might fail due to:
         /// - Network issues (OnStatusChanged() StatusCode.ExceptionOnConnect)
         /// - Region not available (OnOperationResponse() for OpAuthenticate with ReturnCode == ErrorCode.InvalidRegion)
         /// - Subscription CCU limit reached (OnOperationResponse() for OpAuthenticate with ReturnCode == ErrorCode.MaxCcuReached)
         /// More about the connection limitations:
-        /// http://doc.exitgames.com/photon-cloud/SubscriptionErrorCases/#cat-references
+        /// http://doc.photonengine.com/photon-cloud/SubscriptionErrorCases/#cat-references
         /// </remarks>
-        /// <param name="serverAddress">Set a master server address instead of using the default. Uses default if null or empty.</param>
+        /// <param name="masterServerAddress">Set a master server address instead of using the default. Uses default if null or empty.</param>
         /// <param name="appId">Your application's name or the AppID assigned by Photon Cloud (as listed in Dashboard). Uses default if null or empty.</param>
         /// <param name="appVersion">Can be used to separate users by their client's version (useful to add features without breaking older clients). Uses default if null or empty.</param>
-        /// <param name="playerName">Optional name for this player. Provide a unique (!) userID to use the Friend Finding feature. Uses default if null or empty.</param>
-        /// <param name="authValues">Set the AuthParameters property to use Custom Authentication (see above). Attempts anonymous auth if null.</param>
+        /// <param name="nickName">Optional name for this player.</param>
+        /// <param name="authValues">Authentication values for this user. Optional. If you provide a unique userID it is used for FindFriends.</param>
         /// <returns>If the operation could be send (can be false for bad server urls).</returns>
-        public bool Connect(string serverAddress, string appId, string appVersion, string playerName, AuthenticationValues authValues)
+        public bool Connect(string masterServerAddress, string appId, string appVersion, string nickName, AuthenticationValues authValues)
         {
-            if (!string.IsNullOrEmpty(serverAddress))
+            if (!string.IsNullOrEmpty(masterServerAddress))
             {
-                this.MasterServerAddress = serverAddress;
+                this.MasterServerAddress = masterServerAddress;
             }
 
             if (!string.IsNullOrEmpty(appId))
@@ -498,37 +610,37 @@ namespace ExitGames.Client.Photon.LoadBalancing
                 this.AppVersion = appVersion;
             }
 
-            if (!string.IsNullOrEmpty(playerName))
+            if (!string.IsNullOrEmpty(nickName))
             {
-                this.PlayerName = playerName;
+                this.NickName = nickName;
             }
 
-            this.CustomAuthenticationValues = authValues;
+            this.AuthValues = authValues;
 
             return this.Connect();
         }
 
+
         /// <summary>
-        /// Starts the "process" to connect to the master server. Set relevant connection values by the properties of this instance.
+        /// Starts the "process" to connect to a Master Server, using MasterServerAddress and AppId properties.
         /// </summary>
         /// <remarks>
+        /// To connect to the Photon Cloud, use ConnectToRegionMaster().
+        ///
         /// The process to connect includes several steps: the actual connecting, establishing encryption, authentification
         /// (of app and optionally the user) and joining a lobby (if AutoJoinLobby is true).
-        ///
-        /// To connect to the Photon Cloud, a valid AppId must be provided. This is shown in the Photon Cloud Dashboard.
-        /// https://cloud.exitgames.com/dashboard
         ///
         /// Users can connect either anonymously or use "Custom Authentication" to verify each individual player's login.
         /// Custom Authentication in Photon uses external services and communities to verify users. While the client provides a user's info,
         /// the service setup is done in the Photon Cloud Dashboard.
-        /// The parameter authValues will set this.CustomAuthenticationValues and use them in the connect process.
+        /// The parameter authValues will set this.AuthValues and use them in the connect process.
         ///
         /// Connecting to the Photon Cloud might fail due to:
         /// - Network issues (OnStatusChanged() StatusCode.ExceptionOnConnect)
         /// - Region not available (OnOperationResponse() for OpAuthenticate with ReturnCode == ErrorCode.InvalidRegion)
         /// - Subscription CCU limit reached (OnOperationResponse() for OpAuthenticate with ReturnCode == ErrorCode.MaxCcuReached)
         /// More about the connection limitations:
-        /// http://doc.exitgames.com/photon-cloud/SubscriptionErrorCases/#cat-references
+        /// http://doc.photonengine.com/photon-cloud/SubscriptionErrorCases/#cat-references
         /// </remarks>
         public virtual bool Connect()
         {
@@ -542,6 +654,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
 
             return false;
         }
+
 
         /// <summary>
         /// Connects to the NameServer for Photon Cloud, where a region and server list can be obtained.
@@ -561,25 +674,6 @@ namespace ExitGames.Client.Photon.LoadBalancing
             return true;
         }
 
-        /// <summary>
-        /// While on the NameServer, this gets you the list of regional servers (short names and their IPs to ping them).
-        /// </summary>
-        /// <returns>If the operation could be sent. If false, no operation was sent (e.g. while not connected to the NameServer).</returns>
-        public bool OpGetRegions()
-        {
-            if (this.Server != ServerConnection.NameServer)
-            {
-                return false;
-            }
-
-            bool sent = this.loadBalancingPeer.OpGetRegions(this.AppId);
-            if (sent)
-            {
-                this.AvailableRegions = null;
-            }
-
-            return sent;
-        }
 
         /// <summary>
         /// Connects you to a specific region's Master Server, using the Name Server to find the IP.
@@ -592,7 +686,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
             if (this.State == ClientState.ConnectedToNameServer)
             {
                 this.CloudRegion = region;
-                return this.loadBalancingPeer.OpAuthenticate(this.AppId, this.AppVersion, (this.UserId ?? this.PlayerName), this.CustomAuthenticationValues, region);
+                return this.loadBalancingPeer.OpAuthenticate(this.AppId, this.AppVersion, this.AuthValues, region, requestLobbyStatistics);
             }
 
             this.CloudRegion = region;
@@ -605,6 +699,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
             return true;
         }
 
+
         /// <summary>Disconnects this client from any server and sets this.State if the connection is successfuly closed.</summary>
         public void Disconnect()
         {
@@ -612,7 +707,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
             {
                 this.State = ClientState.Disconnecting;
                 this.loadBalancingPeer.Disconnect();
-                
+
                 // we can set this high-level state if the low-level (connection)state is "disconnected"
                 if (this.loadBalancingPeer.PeerState == PeerStateValue.Disconnected || this.loadBalancingPeer.PeerState == PeerStateValue.InitializingApplication)
                 {
@@ -623,7 +718,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
 
 
         /// <summary>
-        /// This method excutes dispatches all incoming commands and sends anything in the outgoing queues via 
+        /// This method excutes dispatches all incoming commands and sends anything in the outgoing queues via
         /// DispatchIncomingCommands and SendOutgoingCommands.
         /// </summary>
         /// <remarks>
@@ -636,8 +731,8 @@ namespace ExitGames.Client.Photon.LoadBalancing
         ///
         /// Call this method regularly (2..20 times a second).
         ///
-        /// This will Dispatch ANY received commands (unless a reliable command in-order is still missing) and 
-        /// events AND will send queued outgoing commands. Fewer calls might be more effective if a device 
+        /// This will Dispatch ANY received commands (unless a reliable command in-order is still missing) and
+        /// events AND will send queued outgoing commands. Fewer calls might be more effective if a device
         /// cannot send many packets per second, as multiple operations might be combined into one package.
         /// </remarks>
         /// <example>
@@ -655,6 +750,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
                 this.loadBalancingPeer.Service();
             }
         }
+
 
         /// <summary>
         /// Private Disconnect variant that sets the state, too.
@@ -677,6 +773,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
             this.loadBalancingPeer.Disconnect();
         }
 
+
         /// <summary>
         /// Privately used only.
         /// Starts the "process" to connect to the game server (connect before a game is joined).
@@ -693,24 +790,26 @@ namespace ExitGames.Client.Photon.LoadBalancing
             return false;
         }
 
-        /// \deprecated Use alternative with TypedLobby parameter.
         /// <summary>
-        /// Joins the lobby on the Master Server, where you get a list of RoomInfos of currently open rooms.
-        /// This is an async request which triggers a OnOperationResponse() call.
+        /// While on the NameServer, this gets you the list of regional servers (short names and their IPs to ping them).
         /// </summary>
-        /// <returns>If the operation could be sent (has to be connected).</returns>
-        [Obsolete]
-        public bool OpJoinLobby(string name, LobbyType lobbyType)
+        /// <returns>If the operation could be sent. If false, no operation was sent (e.g. while not connected to the NameServer).</returns>
+        public bool OpGetRegions()
         {
-            TypedLobby lobby = new TypedLobby(name, lobbyType);
-            bool sent = this.loadBalancingPeer.OpJoinLobby(lobby);
+            if (this.Server != ServerConnection.NameServer)
+            {
+                return false;
+            }
+
+            bool sent = this.loadBalancingPeer.OpGetRegions(this.AppId);
             if (sent)
             {
-                this.CurrentLobby = lobby;
+                this.AvailableRegions = null;
             }
 
             return sent;
         }
+
 
         /// <summary>
         /// Joins the lobby on the Master Server, where you get a list of RoomInfos of currently open rooms.
@@ -732,6 +831,8 @@ namespace ExitGames.Client.Photon.LoadBalancing
 
             return sent;
         }
+
+
         /// <summary>Opposite of joining a lobby. You don't have to explicitly leave a lobby to join another (client can be in one max, at any time).</summary>
         /// <returns>If the operation could be sent (has to be connected).</returns>
         public bool OpLeaveLobby()
@@ -739,332 +840,365 @@ namespace ExitGames.Client.Photon.LoadBalancing
             return this.loadBalancingPeer.OpLeaveLobby();
         }
 
-        /// <summary>
-        /// Operation to join a random, available room.
-        /// This operation fails if all rooms are closed or full.
-        /// If successful, the result contains a gameserver address and the name of some room.
-        /// </summary>
-        /// <remarks>This override sets the state of the client.</remarks>
+
+        /// <summary>Operation to join a random room if available. You can use room properties to filter accepted rooms.</summary>
+        /// <remarks>
+        /// You can use expectedCustomRoomProperties and expectedMaxPlayers as filters for accepting rooms.
+        /// If you set expectedCustomRoomProperties, a room must have the exact same key values set at Custom Properties.
+        /// You need to define which Custom Room Properties will be available for matchmaking when you create a room.
+        /// See: OpCreateRoom(string roomName, RoomOptions roomOptions, TypedLobby lobby)
+        ///
+        /// This operation fails if no rooms are fitting or available (all full, closed or not visible).
+        /// Override this class and implement OnOperationResponse(OperationResponse operationResponse).
+        ///
+        /// OpJoinRandomRoom can only be called while the client is connected to a Master Server.
+        /// You should check LoadBalancingClient.Server and LoadBalancingClient.IsConnectedAndReady before calling this method.
+        /// Alternatively, check the returned bool value.
+        ///
+        /// While the server is looking for a game, the State will be Joining. It's set immediately when this method sent the Operation.
+        ///
+        /// If successful, the LoadBalancingClient will get a Game Server Address and use it automatically
+        /// to switch servers and join the room. When you're in the room, this client's State will become
+        /// ClientState.Joined (both, for joining or creating it).
+        /// Set a OnStateChangeAction method to check for states.
+        ///
+        /// When joining a room, this client's Player Custom Properties will be sent to the room.
+        /// Use LocalPlayer.SetCustomProperties to set them, even while not yet in the room.
+        /// Note that the player properties will be cached locally and sent to any next room you would join, too.
+        ///
+        /// More about matchmaking:
+        /// http://doc.photonengine.com/en/realtime/current/reference/matchmaking-and-lobby
+        /// </remarks>
         /// <param name="expectedCustomRoomProperties">Optional. A room will only be joined, if it matches these custom properties (with string keys).</param>
         /// <param name="expectedMaxPlayers">Filters for a particular maxplayer setting. Use 0 to accept any maxPlayer value.</param>
-        /// <returns>If the operation could be sent currently (requires connection).</returns>
+        /// <returns>If the operation could be sent currently (requires connection to Master Server).</returns>
         public bool OpJoinRandomRoom(Hashtable expectedCustomRoomProperties, byte expectedMaxPlayers)
         {
             return OpJoinRandomRoom(expectedCustomRoomProperties, expectedMaxPlayers, MatchmakingMode.FillRoom, TypedLobby.Default, null);
         }
 
-        /// <summary>
-        /// Operation to join a random, available room.
-        /// This operation fails if all rooms are closed or full.
-        /// If successful, the result contains a gameserver address and the name of some room.
-        /// </summary>
-        /// <remarks>This override sets the state of the client.</remarks>
+
+        /// <summary>Operation to join a random room if available. You can use room properties to filter accepted rooms.</summary>
+        /// <remarks>
+        /// You can use expectedCustomRoomProperties and expectedMaxPlayers as filters for accepting rooms.
+        /// If you set expectedCustomRoomProperties, a room must have the exact same key values set at Custom Properties.
+        /// You need to define which Custom Room Properties will be available for matchmaking when you create a room.
+        /// See: OpCreateRoom(string roomName, RoomOptions roomOptions, TypedLobby lobby)
+        ///
+        /// This operation fails if no rooms are fitting or available (all full, closed or not visible).
+        /// Override this class and implement OnOperationResponse(OperationResponse operationResponse).
+        ///
+        /// OpJoinRandomRoom can only be called while the client is connected to a Master Server.
+        /// You should check LoadBalancingClient.Server and LoadBalancingClient.IsConnectedAndReady before calling this method.
+        /// Alternatively, check the returned bool value.
+        ///
+        /// While the server is looking for a game, the State will be Joining. It's set immediately when this method sent the Operation.
+        ///
+        /// If successful, the LoadBalancingClient will get a Game Server Address and use it automatically
+        /// to switch servers and join the room. When you're in the room, this client's State will become
+        /// ClientState.Joined (both, for joining or creating it).
+        /// Set a OnStateChangeAction method to check for states.
+        ///
+        /// When joining a room, this client's Player Custom Properties will be sent to the room.
+        /// Use LocalPlayer.SetCustomProperties to set them, even while not yet in the room.
+        /// Note that the player properties will be cached locally and sent to any next room you would join, too.
+        ///
+        /// More about matchmaking:
+        /// http://doc.photonengine.com/en/realtime/current/reference/matchmaking-and-lobby
+        /// </remarks>
         /// <param name="expectedCustomRoomProperties">Optional. A room will only be joined, if it matches these custom properties (with string keys).</param>
         /// <param name="expectedMaxPlayers">Filters for a particular maxplayer setting. Use 0 to accept any maxPlayer value.</param>
         /// <param name="matchmakingMode">Selects one of the available matchmaking algorithms. See MatchmakingMode enum for options.</param>
-        /// <returns>If the operation could be sent currently (requires connection).</returns>
+        /// <returns>If the operation could be sent currently (requires connection to Master Server).</returns>
         public bool OpJoinRandomRoom(Hashtable expectedCustomRoomProperties, byte expectedMaxPlayers, MatchmakingMode matchmakingMode)
         {
             return this.OpJoinRandomRoom(expectedCustomRoomProperties, expectedMaxPlayers, matchmakingMode, TypedLobby.Default, null);
         }
 
-        /// \deprecated Use overload with TypedLobby Parameter.
-        /// <summary>Operation to join a random, available room.</summary>
-        [Obsolete("Use overload with TypedLobby Parameter")]
-        public bool OpJoinRandomRoom(Hashtable expectedCustomRoomProperties, byte expectedMaxPlayers, MatchmakingMode matchmakingMode, string lobbyName, LobbyType lobbyType, string sqlLobbyFilter)
-        {
-            return this.OpJoinRandomRoom(expectedCustomRoomProperties, expectedMaxPlayers, matchmakingMode, new TypedLobby() {Name = lobbyName, Type = lobbyType}, sqlLobbyFilter);
-        }
-
-        /// <summary>
-        /// Operation to join a random, available room.
-        /// This operation fails if all rooms are closed or full.
-        /// If successful, the result contains a gameserver address and the name of some room.
-        /// </summary>
-        /// <remarks>This override sets the state of the client.</remarks>
+        
+        /// <summary>Operation to join a random room if available. You can use room properties to filter accepted rooms.</summary>
+        /// <remarks>
+        /// You can use expectedCustomRoomProperties and expectedMaxPlayers as filters for accepting rooms.
+        /// If you set expectedCustomRoomProperties, a room must have the exact same key values set at Custom Properties.
+        /// You need to define which Custom Room Properties will be available for matchmaking when you create a room.
+        /// See: OpCreateRoom(string roomName, RoomOptions roomOptions, TypedLobby lobby)
+        ///
+        /// This operation fails if no rooms are fitting or available (all full, closed or not visible).
+        /// Override this class and implement OnOperationResponse(OperationResponse operationResponse).
+        ///
+        /// OpJoinRandomRoom can only be called while the client is connected to a Master Server.
+        /// You should check LoadBalancingClient.Server and LoadBalancingClient.IsConnectedAndReady before calling this method.
+        /// Alternatively, check the returned bool value.
+        ///
+        /// While the server is looking for a game, the State will be Joining.
+        /// It's set immediately when this method sent the Operation.
+        ///
+        /// If successful, the LoadBalancingClient will get a Game Server Address and use it automatically
+        /// to switch servers and join the room. When you're in the room, this client's State will become
+        /// ClientState.Joined (both, for joining or creating it).
+        /// Set a OnStateChangeAction method to check for states.
+        ///
+        /// When joining a room, this client's Player Custom Properties will be sent to the room.
+        /// Use LocalPlayer.SetCustomProperties to set them, even while not yet in the room.
+        /// Note that the player properties will be cached locally and sent to any next room you would join, too.
+        ///
+        /// The parameter lobby can be null (using the defaul lobby) or a typed lobby you make up.
+        /// Lobbies are created on the fly, as required by the clients. If you organize matchmaking with lobbies,
+        /// keep in mind that they also fragment your matchmaking. Using more lobbies will put less rooms in each.
+        ///
+        /// The parameter sqlLobbyFilter can only be combined with the LobbyType.SqlLobby. In that case, it's used
+        /// to define a sql-like "WHERE" clause for filtering rooms. This is useful for skill-based matchmaking e.g..
+        ///
+        /// More about matchmaking:
+        /// http://doc.photonengine.com/en/realtime/current/reference/matchmaking-and-lobby
+        /// </remarks>
         /// <param name="expectedCustomRoomProperties">Optional. A room will only be joined, if it matches these custom properties (with string keys).</param>
         /// <param name="expectedMaxPlayers">Filters for a particular maxplayer setting. Use 0 to accept any maxPlayer value.</param>
         /// <param name="matchmakingMode">Selects one of the available matchmaking algorithms. See MatchmakingMode enum for options.</param>
         /// <param name="lobby">The lobby in which to find a room. Use null for default lobby.</param>
-        /// <param name="sqlLobbyFilter">Basically the "where" clause of a sql statement. Use null for random game. Examples: "C0 = 1 AND C2 > 50". "C5 = \"Map2\" AND C2 > 10 AND C2 < 20"</param>
-        /// <returns>If the operation could be sent currently (requires connection).</returns>
+        /// <param name="sqlLobbyFilter">Can be used with LobbyType.SqlLobby only. This is a "where" clause of a sql statement. Use null for random game.</param>
+        /// <returns>If the operation could be sent currently (requires connection to Master Server).</returns>
         public bool OpJoinRandomRoom(Hashtable expectedCustomRoomProperties, byte expectedMaxPlayers, MatchmakingMode matchmakingMode, TypedLobby lobby, string sqlLobbyFilter)
         {
-            if (lobby == null )
+            if (lobby == null)
             {
                 lobby = TypedLobby.Default;
             }
+
             this.State = ClientState.Joining;
             this.lastJoinType = JoinType.JoinRandomRoom;
-            this.lastJoinActorNumber = 0;
-            this.CurrentRoom = CreateRoom(null, new RoomOptions());
-
-            Hashtable playerPropsToSend = null;
-            if (this.Server == ServerConnection.GameServer)
-            {
-                playerPropsToSend = this.LocalPlayer.AllProperties;
-            }
-
             this.CurrentLobby = lobby;
-            return this.loadBalancingPeer.OpJoinRandomRoom(expectedCustomRoomProperties, expectedMaxPlayers, playerPropsToSend, matchmakingMode, lobby, sqlLobbyFilter);
+
+            this.enterRoomParamsCache = new LoadBalancingPeer.EnterRoomParams();
+            this.enterRoomParamsCache.Lobby = lobby;
+
+            LoadBalancingPeer.OpJoinRandomRoomParams opParams = new LoadBalancingPeer.OpJoinRandomRoomParams();
+            opParams.ExpectedCustomRoomProperties = expectedCustomRoomProperties;
+            opParams.ExpectedMaxPlayers = expectedMaxPlayers;
+            opParams.MatchingType = matchmakingMode;
+            opParams.TypedLobby = lobby;
+            opParams.SqlLobbyFilter = sqlLobbyFilter;
+            return this.loadBalancingPeer.OpJoinRandomRoom(opParams);
+            
+            //return this.loadBalancingPeer.OpJoinRandomRoom(expectedCustomRoomProperties, expectedMaxPlayers, playerPropsToSend, matchmakingMode, lobby, sqlLobbyFilter);
         }
 
+
         /// <summary>
-        /// Joins a room by name and sets this player's properties.
+        /// Joins a room by roomName. Useful when using room lists in lobbies or when you know the name otherwise.
         /// </summary>
         /// <remarks>
-        /// Join will try to enter a room by roomName. If the room is full or closed or not existing, this will fail.
-        /// 
-        /// This overrides the LoadBalancingPeer.OpJoinRoom to keep a state.
+        /// This method is useful when you are using a lobby to list rooms and know their names.
+        /// A room's name has to be unique (per region and game version), so it does not matter which lobby it's in.
+        ///
+        /// If the room is full, closed or not existing, this will fail. Override this class and implement
+        /// OnOperationResponse(OperationResponse operationResponse) to get the errors.
+        ///
+        /// OpJoinRoom can only be called while the client is connected to a Master Server.
+        /// You should check LoadBalancingClient.Server and LoadBalancingClient.IsConnectedAndReady before calling this method.
+        /// Alternatively, check the returned bool value.
+        ///
+        /// While the server is joining the game, the State will be ClientState.Joining.
+        /// It's set immediately when this method sends the Operation.
+        ///
+        /// If successful, the LoadBalancingClient will get a Game Server Address and use it automatically
+        /// to switch servers and join the room. When you're in the room, this client's State will become
+        /// ClientState.Joined (both, for joining or creating it).
+        /// Set a OnStateChangeAction method to check for states.
+        ///
+        /// When joining a room, this client's Player Custom Properties will be sent to the room.
+        /// Use LocalPlayer.SetCustomProperties to set them, even while not yet in the room.
+        /// Note that the player properties will be cached locally and sent to any next room you would join, too.
+        ///
+        /// It's usually better to use OpJoinOrCreateRoom for invitations.
+        /// Then it does not matter if the room is already setup.
         /// </remarks>
         /// <param name="roomName">The name of the room to join. Must be existing already, open and non-full or can't be joined.</param>
-        /// <returns>If the operation could be sent (has to be connected).</returns>
+        /// <returns>If the operation could be sent currently (requires connection to Master Server).</returns>
         public bool OpJoinRoom(string roomName)
         {
             return this.OpJoinRoom(roomName, 0);
         }
 
-        /// \deprecated We introduced OpJoinOrCreateRoom to make the parameter createIfNotExists obsolete. Use either OpJoinRoom or OpJoinOrCreateRoom.
-        /// <summary>
-        /// Joins a room by name and sets this player's properties. Optionally, a room can be created if not existing already.
-        /// </summary>
-        /// <remarks>
-        /// Join will try to enter a room by roomName. If the room is full or closed, this will fail.
-        /// If the room is not existing, JoinRoom will also fail by default. 
-        /// 
-        /// You can set createIfNotExists to true to make the server instantly create the room if it doesn't exist.
-        /// This makes it easier to get into the same room when several players exchanged a roomName already: 
-        /// Any player can try to join or create the room in one step - it doesn't matter who's first.
-        /// 
-        /// If the room is created due to createIfNotExists, the LocalPlayer.ID will be 1 and LocalPlayer.IsMasterClient
-        /// will be true as well.
-        /// 
-        /// This overrides the LoadBalancingPeer.OpJoinRoom to keep a state.
-        /// </remarks>
-        /// <param name="roomName">The name of the room to join. Must be existing already, open and non-full or can't be joined.</param>
-        /// <param name="createIfNotExists">If true, the server will attempt to create a room.</param>
-        /// <returns>If the operation could be sent (has to be connected).</returns>
-        [Obsolete("We introduced OpJoinOrCreateRoom to make the parameter createIfNotExists obsolete. Use either OpJoinRoom or OpJoinOrCreateRoom.")]
-        public bool OpJoinRoom(string roomName, bool createIfNotExists)
-        {
-            return OpJoinRoom(roomName, createIfNotExists, 0);
-        }
-
-        /// \deprecated We introduced OpJoinOrCreateRoom to make the parameter createIfNotExists obsolete. Use either OpJoinRoom or OpJoinOrCreateRoom.
-        /// <summary>
-        /// Joins a room by name and sets this player's properties. Optionally, a room can be created if not existing already.
-        /// </summary>
-        [Obsolete("We introduced OpJoinOrCreateRoom to make the parameter createIfNotExists obsolete. Use either OpJoinRoom or OpJoinOrCreateRoom.")]
-        public bool OpJoinRoom(string roomName, bool createIfNotExists, int actorNumber)
-        {
-            if (createIfNotExists)
-            {
-                return this.OpJoinOrCreateRoom(roomName, actorNumber, null);
-            }
-            else
-            {
-                return this.OpJoinRoom(roomName, actorNumber);
-            }
-        }
 
         /// <summary>
-        /// Joins a room by name and sets this player's properties. Optionally, a room can be created if not existing already.
+        /// Joins a room by roomName. If this client returns to the room, set the previously used Player.ID as actorNumber.
         /// </summary>
         /// <remarks>
-        /// Join will try to enter a room by roomName. If the room is full or closed, this will fail.
-        /// If the room is not existing, JoinRoom will also fail by default.         
-        /// This overrides the LoadBalancingPeer.OpJoinRoom to keep a state.
+        /// This method is useful when you are using a lobby to list rooms and know their names.
+        /// A room's name has to be unique (per region and game version), so it does not matter which lobby it's in.
+        ///
+        /// If this client returns to the room, set the previously used Player.ID as actorNumber.
+        /// When you are using Custom Authentication with unique user IDs, the server will use the userID
+        /// to find the previously assigned actorNumber in the room.
+        ///
+        /// For turnbased games, this is especially useful as rooms can be continued after hours or days.
+        /// To return to a room, set the actorNumber to anything but 0. It's best practice to use -1 with
+        /// Custom Authentication and unique user accounts.
+        ///
+        /// If the room is full, closed or not existing, this will fail. Override this class and implement
+        /// OnOperationResponse(OperationResponse operationResponse) to get the errors.
+        ///
+        /// OpJoinRoom can only be called while the client is connected to a Master Server.
+        /// You should check LoadBalancingClient.Server and LoadBalancingClient.IsConnectedAndReady before calling this method.
+        /// Alternatively, check the returned bool value.
+        ///
+        /// While the server is joining the game, the State will be ClientState.Joining.
+        /// It's set immediately when this method sends the Operation.
+        ///
+        /// If successful, the LoadBalancingClient will get a Game Server Address and use it automatically
+        /// to switch servers and join the room. When you're in the room, this client's State will become
+        /// ClientState.Joined (both, for joining or creating it).
+        /// Set a OnStateChangeAction method to check for states.
+        ///
+        /// When joining a room, this client's Player Custom Properties will be sent to the room.
+        /// Use LocalPlayer.SetCustomProperties to set them, even while not yet in the room.
+        /// Note that the player properties will be cached locally and sent to any next room you would join, too.
+        ///
+        /// It's usually better to use OpJoinOrCreateRoom for invitations.
+        /// Then it does not matter if the room is already setup.
         /// </remarks>
         /// <param name="roomName">The name of the room to join. Must be existing already, open and non-full or can't be joined.</param>
-        /// <param name="actorNumber">An actorNumber to claim in room in case the client re-joins a room. Use 0 to not claim an actorNumber.</param>
-        /// <returns>If the operation could be sent (has to be connected).</returns>
+        /// <param name="actorNumber">When returning to a room, use a non-0 value. For Turnbased games, set the previously assigned Player.ID or -1 when using Custom Authentication.</param>
+        /// <returns>If the operation could be sent currently (requires connection to Master Server).</returns>
         public bool OpJoinRoom(string roomName, int actorNumber)
         {
             this.State = ClientState.Joining;
             this.lastJoinType = JoinType.JoinRoom;
-            this.lastJoinActorNumber = actorNumber;
-            this.createRoomOptions = new RoomOptions();
-            this.CurrentRoom = CreateRoom(roomName, this.createRoomOptions);
-
-            Hashtable playerPropsToSend = null;
-            if (this.Server == ServerConnection.GameServer)
-            {
-                playerPropsToSend = this.LocalPlayer.AllProperties;
-            }
-
             bool onGameServer = this.Server == ServerConnection.GameServer;
-            return this.loadBalancingPeer.OpJoinRoom(roomName, playerPropsToSend, actorNumber, this.createRoomOptions, false, onGameServer);
+
+
+            LoadBalancingPeer.EnterRoomParams opParams = new LoadBalancingPeer.EnterRoomParams();
+            this.enterRoomParamsCache = opParams;
+            opParams.RoomName = roomName;
+            opParams.ActorNumber = actorNumber;
+            opParams.OnGameServer = onGameServer;
+            
+            return this.loadBalancingPeer.OpJoinRoom(opParams);
         }
 
+        
         /// <summary>
-        /// Joins a room by name or creates new room if room with given name not exists.
+        /// Joins a specific room by name. If the room does not exist (yet), it will be created implicitly.
         /// </summary>
         /// <remarks>
-        /// Join will try to enter a room by roomName. Unlike OpJoinRoom, this will create the room if it doesn't exist.
+        /// Unlike OpJoinRoom, this operation does not fail if the room does not exist.
+        /// This can be useful when you send invitations to a room before actually creating it:
+        /// Any invited player (whoever is first) can call this and on demand, the room gets created implicitly.
+        ///
+        /// If you set room properties in RoomOptions, they get ignored when the room is existing already.
+        /// This avoids changing the room properties by late joining players. Only when the room gets created,
+        /// the RoomOptions are set in this case.
+        ///
+        /// If this client returns to the room, set the previously used Player.ID as actorNumber.
+        /// When you are using Custom Authentication with unique user IDs, the server will use the userID
+        /// to find the previously assigned actorNumber in the room.
+        ///
+        /// For turnbased games, this is especially useful as rooms can be continued after hours or days.
+        /// To return to a room, set the actorNumber to anything but 0. It's best practice to use -1 with
+        /// Custom Authentication and unique user accounts.
+        ///
+        /// If the room is full or closed, this will fail. Override this class and implement
+        /// OnOperationResponse(OperationResponse operationResponse) to get the errors.
+        ///
+        /// This method can only be called while the client is connected to a Master Server.
+        /// You should check LoadBalancingClient.Server and LoadBalancingClient.IsConnectedAndReady before calling this method.
+        /// Alternatively, check the returned bool value.
+        ///
+        /// While the server is joining the game, the State will be ClientState.Joining.
+        /// It's set immediately when this method sends the Operation.
+        ///
+        /// If successful, the LoadBalancingClient will get a Game Server Address and use it automatically
+        /// to switch servers and join the room. When you're in the room, this client's State will become
+        /// ClientState.Joined (both, for joining or creating it).
+        /// Set a OnStateChangeAction method to check for states.
+        ///
+        /// When entering the room, this client's Player Custom Properties will be sent to the room.
+        /// Use LocalPlayer.SetCustomProperties to set them, even while not yet in the room.
+        /// Note that the player properties will be cached locally and sent to any next room you would join, too.
         /// </remarks>
-        /// <param name="roomName">The name of the room to join. Must be existing already, open and non-full or can't be joined.</param>
-        /// <param name="actorNumber">An actorNumber to claim in room in case the client re-joins a room. Use 0 to not claim an actorNumber.</param>
+        /// <param name="roomName">The name of the room to join (might be created implicitly).</param>
+        /// <param name="actorNumber">When returning to a room, use a non-0 value. For Turnbased games, set the previously assigned Player.ID or -1 when using Custom Authentication.</param>
         /// <param name="roomOptions">Contains the parameters and properties of the new room. See RoomOptions class for a description of each.</param>
-        /// <returns>If the operation could be sent (has to be connected).</returns>
-        public bool OpJoinOrCreateRoom(string roomName, int actorNumber, RoomOptions roomOptions)
+        /// <param name="lobby">Typed lobby to be used if the roomname is not in use (and room gets created). If != null, it will also set CurrentLobby.</param>
+        /// <returns>If the operation could be sent currently (requires connection to Master Server).</returns>
+        public bool OpJoinOrCreateRoom(string roomName, int actorNumber, RoomOptions roomOptions, TypedLobby lobby)
         {
-            if (roomOptions == null)
-            {
-                roomOptions = new RoomOptions();
-            }
             this.State = ClientState.Joining;
             this.lastJoinType = JoinType.JoinOrCreateRoom;
-            this.lastJoinActorNumber = actorNumber;
-            this.createRoomOptions = roomOptions;
-            this.CurrentRoom = CreateRoom(roomName, roomOptions);
-
-            Hashtable playerPropsToSend = null;
-            if (this.Server == ServerConnection.GameServer)
-            {
-                playerPropsToSend = this.LocalPlayer.AllProperties;
-            }
-
+            this.CurrentLobby = lobby;
             bool onGameServer = this.Server == ServerConnection.GameServer;
-            return this.loadBalancingPeer.OpJoinRoom(roomName, playerPropsToSend, actorNumber, roomOptions, true, onGameServer);
-        }
 
-        /// \deprecated Use overload with RoomOptions parameter.
-        /// <summary>
-        /// Creates a new room on the server (or fails when the name is already taken).
-        /// </summary>
-        [Obsolete("Use overload with RoomOptions parameter.")]
-        public bool OpCreateRoom(string roomName, byte maxPlayers, Hashtable customGameProperties, string[] propsListedInLobby)
-        {
-            return this.OpCreateRoom(roomName, true, true, maxPlayers, customGameProperties, propsListedInLobby, null, LobbyType.Default);
-        }
+            LoadBalancingPeer.EnterRoomParams opParams = new LoadBalancingPeer.EnterRoomParams();
+            this.enterRoomParamsCache = opParams;
+            opParams.RoomName = roomName;
+            opParams.ActorNumber = actorNumber;
+            opParams.RoomOptions = roomOptions;
+            opParams.Lobby = lobby;
+            opParams.CreateIfNotExists = true;
+            opParams.OnGameServer = onGameServer;
 
-        /// \deprecated Use overload with RoomOptions parameter.
-        /// <summary>
-        /// Creates a new room on the server (or fails when the name is already taken).
-        /// </summary>
-        [Obsolete("Use overload with RoomOptions parameter.")]
-        public bool OpCreateRoom(string roomName, bool isVisible, bool isOpen, byte maxPlayers, Hashtable customGameProperties, string[] propsListedInLobby)
-        {
-            return this.OpCreateRoom(roomName, isVisible, isOpen, maxPlayers, customGameProperties, propsListedInLobby, null, LobbyType.Default);
-        }
-
-        /// \deprecated Use overload with RoomOptions parameter.
-        /// <summary>
-        /// Creates a new room on the server (or fails when the name is already taken).
-        /// </summary>
-        [Obsolete("Use overload with RoomOptions parameter.")]
-        public bool OpCreateRoom(string roomName, bool isVisible, bool isOpen, byte maxPlayers, Hashtable customGameProperties, string[] propsListedInLobby, string lobbyName, LobbyType lobbyType)
-        {
-            return this.OpCreateRoom(roomName, isVisible, isOpen, maxPlayers, customGameProperties, propsListedInLobby, null, LobbyType.Default, 0, 0);
-        }
-
-        /// \deprecated Use overload with RoomOptions parameter.
-        ///  <summary>
-        ///  Creates a new room on the server (or fails when the name is already taken).
-        ///  </summary>
-        ///  <remarks>
-        ///  If you don't want to create a unique room-name, pass null or "" as name and the server will assign a
-        ///  roomName (a GUID as string). Room names are unique.
-        ///  
-        ///  They will be attached to the specified lobby (by name and type). Use null as lobbyName to attach the 
-        ///  room to the default lobby.
-        ///  Multiple lobbies can help separate players by map or skill or game type. Each room can only be found 
-        ///  in one lobby (no matter if defined by name and type or as default).
-        /// 
-        ///  The response depends on the server the peer is connected to:
-        ///  Master will return a Game Server toon connect to.
-        ///  Game Server will return the Room's data.
-        ///  This is an async request which triggers a OnOperationResponse() call.
-        ///  
-        ///  This override sets the state of the client.
-        ///  </remarks>
-        ///  <param name="roomName">The name to create a room with. Must be unique and not in use or can't be created. If null, the server will assign a GUID as name.</param>
-        ///  <param name="isVisible">Shows the room in the lobby's room list.</param>
-        ///  <param name="isOpen">Keeps players from joining the room (or opens it to everyone).</param>
-        ///  <param name="maxPlayers">Max players before room is considered full (but still listed).</param>
-        ///  <param name="customGameProperties">Custom properties to apply to the room on creation (use string-typed keys but short ones).</param>
-        ///  <param name="propsListedInLobby">Defines the custom room properties that get listed in the lobby. Null defaults to "none", a string[0].</param>
-        ///  <param name="lobbyName">Name of the lobby this game gets added to. Default: null, attached to default lobby. Lobbies are unique per lobbyName plus lobbyType, so the same name can be used when several types are existing.</param>
-        ///  <param name="lobbyType">Type of the (named)lobby this game gets added to.</param>
-        ///  <param name="playerTtl">Defines how long (in milliseconds) a player can be disconnected (thus being inactive) before being removed from a game (for good).</param>
-        ///  <param name="roomTtl">Defines how long the room will stay in memory of Photon until it gets cleaned up. Indirectly this also defines how long players can return. Turnbased games get stored/persisted after this timeout.</param>
-        /// <returns>If the operation could be sent (has to be connected).</returns>
-        [Obsolete("Use overload with RoomOptions parameter.")]
-        public bool OpCreateRoom(string roomName, bool isVisible, bool isOpen, byte maxPlayers, Hashtable customGameProperties, string[] propsListedInLobby, string lobbyName, LobbyType lobbyType, int playerTtl, int roomTtl)
-        {
-            this.State = ClientState.Joining;
-            this.lastJoinType = JoinType.CreateRoom;
-            this.lastJoinActorNumber = 0;
-            this.createRoomOptions = new RoomOptions()
-            {
-                IsVisible = isVisible,
-                IsOpen = isOpen,
-                MaxPlayers = maxPlayers,
-                PlayerTtl = playerTtl,
-                EmptyRoomTtl = roomTtl,
-                CleanupCacheOnLeave = true,
-                CustomRoomProperties = customGameProperties,
-                CustomRoomPropertiesForLobby = propsListedInLobby
-            };
-            this.CurrentRoom = this.CreateRoom(roomName, this.createRoomOptions);
-
-            Hashtable playerPropsToSend = null;
-            if (this.Server == ServerConnection.GameServer)
-            {
-                playerPropsToSend = this.LocalPlayer.AllProperties;
-            }
-
-            this.CurrentLobby = new TypedLobby(lobbyName, lobbyType);
-
-            bool onGameServer = this.Server == ServerConnection.GameServer;
-            return this.loadBalancingPeer.OpCreateRoom(roomName, this.createRoomOptions, new TypedLobby(lobbyName, lobbyType), playerPropsToSend, onGameServer);
+            return this.loadBalancingPeer.OpJoinRoom(opParams);
+            //return this.loadBalancingPeer.OpJoinRoom(roomName, playerPropsToSend, actorNumber, roomOptions, lobby, true, onGameServer);
         }
 
 
         /// <summary>
-        /// Creates a new room on the server (or fails if the name is already taken).
+        /// Creates a new room on the server (or fails if the name is already in use).
         /// </summary>
         /// <remarks>
         /// If you don't want to create a unique room-name, pass null or "" as name and the server will assign a
         /// roomName (a GUID as string). Room names are unique.
-        /// 
-        /// A room will be attached to the specified lobby (by name and type). Use null as lobbyName to attach the 
+        ///
+        /// A room will be attached to the specified lobby. Use null as lobby to attach the
         /// room to the lobby you are now in. If you are in no lobby, the default lobby is used.
-        /// Multiple lobbies can help separate players by map or skill or game type. Each room can only be found 
+        ///
+        /// Multiple lobbies can help separate players by map or skill or game type. Each room can only be found
         /// in one lobby (no matter if defined by name and type or as default).
-        /// 
-        /// This method returns if the operation can be send at the moment. You must be connected and authenticated 
-        /// on the Master Server.
-        /// 
-        /// The operation-response depends on the server the peer is connected to:
-        ///  Master will return a Game Server to connect to.
-        ///  Game Server will return the Room's data.
-        ///  This is an async request which triggers a OnOperationResponse() call.
-        /// 
-        /// This override sets the state of the client.
+        ///
+        /// This method can only be called while the client is connected to a Master Server.
+        /// You should check LoadBalancingClient.Server and LoadBalancingClient.IsConnectedAndReady before calling this method.
+        /// Alternatively, check the returned bool value.
+        ///
+        /// Even when sent, the Operation will fail (on the server) if the roomName is in use.
+        /// Override this class and implement  OnOperationResponse(OperationResponse operationResponse) to get the errors.
+        ///
+        ///
+        /// While the server is creating the game, the State will be ClientState.Joining.
+        /// The state Joining is used because the client is on the way to enter a room (no matter if joining or creating).
+        /// It's set immediately when this method sends the Operation.
+        ///
+        /// If successful, the LoadBalancingClient will get a Game Server Address and use it automatically
+        /// to switch servers and enter the room. When you're in the room, this client's State will become
+        /// ClientState.Joined (both, for joining or creating it).
+        /// Set a OnStateChangeAction method to check for states.
+        ///
+        /// When entering the room, this client's Player Custom Properties will be sent to the room.
+        /// Use LocalPlayer.SetCustomProperties to set them, even while not yet in the room.
+        /// Note that the player properties will be cached locally and sent to any next room you would join, too.
         /// </remarks>
         /// <param name="roomName">The name to create a room with. Must be unique and not in use or can't be created. If null, the server will assign a GUID as name.</param>
         /// <param name="roomOptions">Contains the parameters and properties of the new room. See RoomOptions class for a description of each.</param>
         /// <param name="lobby">The lobby (name and type) in which to create the room. Null uses the current lobby or the default lobby (if not in a lobby).</param>
-        /// <returns>If the operation could be sent (has to be connected).</returns>
+        /// <returns>If the operation could be sent currently (requires connection to Master Server).</returns>
         public bool OpCreateRoom(string roomName, RoomOptions roomOptions, TypedLobby lobby)
         {
             this.State = ClientState.Joining;
             this.lastJoinType = JoinType.CreateRoom;
-            this.lastJoinActorNumber = 0;
-            this.createRoomOptions = roomOptions;
-            this.CurrentRoom = this.CreateRoom(roomName, roomOptions);
-
-            Hashtable playerPropsToSend = null;
-            if (this.Server == ServerConnection.GameServer)
-            {
-                playerPropsToSend = this.LocalPlayer.AllProperties;
-            }
-
             this.CurrentLobby = lobby;
             bool onGameServer = this.Server == ServerConnection.GameServer;
-            return this.loadBalancingPeer.OpCreateRoom(roomName, roomOptions, lobby, playerPropsToSend, onGameServer);
+
+            LoadBalancingPeer.EnterRoomParams opParams = new LoadBalancingPeer.EnterRoomParams();
+            this.enterRoomParamsCache = opParams;
+            opParams.RoomName = roomName;
+            opParams.RoomOptions = roomOptions;
+            opParams.Lobby = lobby;
+            opParams.OnGameServer = onGameServer;
+
+            return this.loadBalancingPeer.OpCreateRoom(opParams);
+            //return this.loadBalancingPeer.OpCreateRoom(roomName, roomOptions, lobby, playerPropsToSend, onGameServer);
         }
+
 
         /// <summary>
         /// Leaves the CurrentRoom and returns to the Master server (back to the lobby).
@@ -1081,25 +1215,28 @@ namespace ExitGames.Client.Photon.LoadBalancing
             return OpLeaveRoom(false);  //TURNBASED
         }
 
+
         /// <summary>
-        /// Leaves the CurrentRoom and returns to the Master server (back to the lobby).
+        /// Leaves the current room, optionally telling the server that the user is just becoming inactive.
+        /// </summary>
+        /// 
+        /// <param name="becomeInactive">If true, this player becomes inactive in the game and can return later (if PlayerTTL of the room is > 0).</param>
+        /// <remarks>
         /// OpLeaveRoom skips execution when the room is null or the server is not GameServer or the client is disconnecting from GS already.
         /// OpLeaveRoom returns false in those cases and won't change the state, so check return of this method.
-        /// </summary>
-        /// <param name="willReturnLater"></param>
-        /// <remarks>
-        /// This method actually is not an operation per se. It sets a state and calls Disconnect().
-        /// This is is quicker than calling OpLeave and then disconnect (which also triggers a leave).
+        /// 
+        /// In some cases, this method will skip the OpLeave call and just call Disconnect(), 
+        /// which not only leaves the room but also the server. Disconnect also triggers a leave and so that workflow is is quicker.
         /// </remarks>
         /// <returns>If the current room could be left (impossible while not in a room).</returns>
-        public bool OpLeaveRoom(bool willReturnLater)
+        public bool OpLeaveRoom(bool becomeInactive)
         {
             if (this.CurrentRoom == null || this.Server != ServerConnection.GameServer || this.State == ClientState.DisconnectingFromGameserver)
             {
                 return false;
             }
 
-            if (willReturnLater)
+            if (becomeInactive)
             {
                 this.State = ClientState.DisconnectingFromGameserver;
                 this.loadBalancingPeer.Disconnect();
@@ -1112,6 +1249,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
 
             return true;
         }
+
 
         /// <summary>
         /// Request the rooms and online status for a list of friends. All clients should set a unique UserId before connecting. The result is available in this.FriendList.
@@ -1151,87 +1289,133 @@ namespace ExitGames.Client.Photon.LoadBalancing
             return this.loadBalancingPeer.OpFindFriends(friendsToFind);
         }
 
+
         /// <summary>
-        /// Sets custom properties of a player / actor (only passing on the string-typed custom properties).
-        /// Use this only when in state Joined.
+        /// Updates and synchronizes a Player's Custom Properties. Optionally, expectedProperties can be provided as condition.
         /// </summary>
-        /// <param name="actorNr">ID of player to update/set properties for.</param>
-        /// <param name="actorProperties">The properties to set for target actor.</param>
-        /// <returns>If sending the properties to the server worked (not if the operation was executed successfully).</returns>
-        public bool OpSetCustomPropertiesOfActor(int actorNr, Hashtable actorProperties)
+        /// <remarks>
+        /// Custom Properties are a set of string keys and arbitrary values which is synchronized
+        /// for the players in a Room. They are available when the client enters the room, as
+        /// they are in the response of OpJoin and OpCreate.
+        ///
+        /// Custom Properties either relate to the (current) Room or a Player (in that Room).
+        ///
+        /// Both classes locally cache the current key/values and make them available as
+        /// property: CustomProperties. This is provided only to read them.
+        /// You must use the method SetCustomProperties to set/modify them.
+        ///
+        /// Any client can set any Custom Properties anytime. It's up to the game logic to organize
+        /// how they are best used.
+        ///
+        /// You should call SetCustomProperties only with key/values that are new or changed. This reduces
+        /// traffic and performance.
+        ///
+        /// Unless you define some expectedProperties, setting key/values is always permitted.
+        /// In this case, the property-setting client will not receive the new values from the server but
+        /// instead update its local cache in SetCustomProperties.
+        ///
+        /// If you define expectedProperties, the server will skip updates if the server property-cache
+        /// does not contain all expectedProperties with the same values.
+        /// In this case, the property-setting client will get an update from the server and update it's
+        /// cached key/values at about the same time as everyone else.
+        ///
+        /// The benefit of using expectedProperties can be only one client successfully sets a key from
+        /// one known value to another.
+        /// As example: Store who owns an item in a Custom Property "ownedBy". It's 0 initally.
+        /// When multiple players reach the item, they all attempt to change "ownedBy" from 0 to their
+        /// actorNumber. If you use expectedProperties {"ownedBy", 0} as condition, the first player to
+        /// take the item will have it (and the others fail to set the ownership).
+        ///
+        /// Properties get saved with the game state for Turnbased games (which use IsPersistent = true).
+        /// </remarks>
+        /// <param name="actorNr">Defines which player the Custom Properties belong to. ActorID of a player.</param>
+        /// <param name="propertiesToSet">Hashtable of Custom Properties that changes.</param>
+        /// <param name="expectedProperties">Provide some keys/values to use as condition for setting the new values.</param>
+        public bool OpSetCustomPropertiesOfActor(int actorNr, Hashtable propertiesToSet, Hashtable expectedProperties = null)
         {
             Hashtable customActorProperties = new Hashtable();
-            customActorProperties.MergeStringKeys(actorProperties);
+            customActorProperties.MergeStringKeys(propertiesToSet);
 
-            return this.OpSetPropertiesOfActor(actorNr, customActorProperties);
+            return this.OpSetPropertiesOfActor(actorNr, customActorProperties, expectedProperties);
         }
 
-        /// <summary>
-        /// This updates the local cache of a player's properties before sending them to the server.
-        /// Use this only when in state Joined.
-        /// </summary>
-        /// <param name="actorNr">ID of player to update/set properties for.</param>
-        /// <param name="actorProperties">The properties to set for target actor.</param>
-        /// <returns>If sending the properties to the server worked (not if the operation was executed successfully).</returns>
-        public bool OpSetPropertiesOfActor(int actorNr, Hashtable actorProperties)
+
+        /// <summary>Internally used to cache and set properties (including well known properties).</summary>
+        protected internal bool OpSetPropertiesOfActor(int actorNr, Hashtable actorProperties, Hashtable expectedProperties = null)
         {
-            Player target = this.CurrentRoom.GetPlayer(actorNr);
-            if (target != null)
+            if (expectedProperties == null || expectedProperties.Count == 0)
             {
-                target.CacheProperties(actorProperties);
+                Player target = this.CurrentRoom.GetPlayer(actorNr);
+                if (target != null)
+                {
+                    target.CacheProperties(actorProperties);
+                }
             }
 
-            return this.loadBalancingPeer.OpSetPropertiesOfActor(actorNr, actorProperties);
+            return this.loadBalancingPeer.OpSetPropertiesOfActor(actorNr, actorProperties, expectedProperties);
         }
 
 
         /// <summary>
-        /// Sets only custom game properties (which exclusively use strings as key-type in hash).
+        /// Updates and synchronizes this Room's Custom Properties. Optionally, expectedProperties can be provided as condition.
         /// </summary>
-        /// <param name="gameProperties">The custom roomProperties to udpate or set.</param>
-        /// <returns>If sending the properties to the server worked (not if the operation was executed successfully).</returns>
-        public bool OpSetCustomPropertiesOfRoom(Hashtable gameProperties)
-        {
-            return this.OpSetCustomPropertiesOfRoom(gameProperties, false);
-        }
-
-        /// <summary>
-        /// Sets only custom game properties (which exclusively use strings as key-type in hash).
-        /// </summary>
-        /// <param name="gameProperties">The roomProperties to udpate or set.</param>
-        /// <param name="webForward">If true, this set of properties will be forwarded to your webhooks (if configured).</param>
-        /// <returns>If sending the properties to the server worked (not if the operation was executed successfully).</returns>
-        public bool OpSetCustomPropertiesOfRoom(Hashtable gameProperties, bool webForward)
+        /// <remarks>
+        /// Custom Properties are a set of string keys and arbitrary values which is synchronized
+        /// for the players in a Room. They are available when the client enters the room, as
+        /// they are in the response of OpJoin and OpCreate.
+        ///
+        /// Custom Properties either relate to the (current) Room or a Player (in that Room).
+        ///
+        /// Both classes locally cache the current key/values and make them available as
+        /// property: CustomProperties. This is provided only to read them.
+        /// You must use the method SetCustomProperties to set/modify them.
+        ///
+        /// Any client can set any Custom Properties anytime. It's up to the game logic to organize
+        /// how they are best used.
+        ///
+        /// You should call SetCustomProperties only with key/values that are new or changed. This reduces
+        /// traffic and performance.
+        ///
+        /// Unless you define some expectedProperties, setting key/values is always permitted.
+        /// In this case, the property-setting client will not receive the new values from the server but
+        /// instead update its local cache in SetCustomProperties.
+        ///
+        /// If you define expectedProperties, the server will skip updates if the server property-cache
+        /// does not contain all expectedProperties with the same values.
+        /// In this case, the property-setting client will get an update from the server and update it's
+        /// cached key/values at about the same time as everyone else.
+        ///
+        /// The benefit of using expectedProperties can be only one client successfully sets a key from
+        /// one known value to another.
+        /// As example: Store who owns an item in a Custom Property "ownedBy". It's 0 initally.
+        /// When multiple players reach the item, they all attempt to change "ownedBy" from 0 to their
+        /// actorNumber. If you use expectedProperties {"ownedBy", 0} as condition, the first player to
+        /// take the item will have it (and the others fail to set the ownership).
+        ///
+        /// Properties get saved with the game state for Turnbased games (which use IsPersistent = true).
+        /// </remarks>
+        /// <param name="propertiesToSet">Hashtable of Custom Properties that changes.</param>
+        /// <param name="webForward">Defines if the set properties should be forwarded to a WebHook.</param>
+        /// <param name="expectedProperties">Provide some keys/values to use as condition for setting the new values.</param>
+        public bool OpSetCustomPropertiesOfRoom(Hashtable propertiesToSet, bool webForward = false, Hashtable expectedProperties = null)
         {
             Hashtable customGameProps = new Hashtable();
-            customGameProps.MergeStringKeys(gameProperties);
+            customGameProps.MergeStringKeys(propertiesToSet);
 
-            return this.OpSetPropertiesOfRoom(customGameProps, webForward);
+            return this.OpSetPropertiesOfRoom(customGameProps, webForward, expectedProperties);
         }
 
-        /// <summary>
-        /// This updates the current room's properties before sending them to the server.
-        /// Use this only while in state Joined.
-        /// </summary>
-        /// <param name="gameProperties">The roomProperties to udpate or set.</param>
-        /// <returns>If sending the properties to the server worked (not if the operation was executed successfully).</returns>
-        protected internal bool OpSetPropertiesOfRoom(Hashtable gameProperties)
+
+        /// <summary>Internally used to cache and set properties (including well known properties).</summary>
+        protected internal bool OpSetPropertiesOfRoom(Hashtable gameProperties, bool webForward, Hashtable expectedProperties = null)
         {
-            return this.OpSetPropertiesOfRoom(gameProperties, false);
+            if (expectedProperties == null || expectedProperties.Count == 0)
+            {
+                this.CurrentRoom.CacheProperties(gameProperties);
+            }
+            return this.loadBalancingPeer.OpSetPropertiesOfRoom(gameProperties, webForward, expectedProperties);
         }
 
-        /// <summary>
-        /// This updates the current room's properties before sending them to the server.
-        /// Use this only while in state Joined.
-        /// </summary>
-        /// <param name="gameProperties">The roomProperties to udpate or set.</param>
-        /// <param name="webForward">If true, this set of properties will be forwarded to your webhooks (if configured).</param>
-        /// <returns>If sending the properties to the server worked (not if the operation was executed successfully).</returns>
-        protected internal bool OpSetPropertiesOfRoom(Hashtable gameProperties, bool webForward)
-        {
-            this.CurrentRoom.CacheProperties(gameProperties);
-            return this.loadBalancingPeer.OpSetPropertiesOfRoom(gameProperties, webForward);
-        }
 
         /// <summary>
         /// Send an event with custom code/type and any content to the other players in the same room.
@@ -1252,33 +1436,34 @@ namespace ExitGames.Client.Photon.LoadBalancing
             return this.loadBalancingPeer.OpRaiseEvent(eventCode, customEventContent, sendReliable, raiseEventOptions);
         }
 
+
         /// <summary>
         /// This operation makes Photon call your custom web-service by path/name with the given parameters (converted into JSon).
         /// </summary>
         /// <remarks>
         /// This is a "Photon Turnbased" feature and you have to setup your Photon Cloud Application prior to use.
-        /// 
+        ///
         /// The response by Photon will call OnOperationResponse() with Code: OperationCode.WebRpc.
         /// It's important to understand that the OperationResponse tells you if the WebRPC could be called or not
         /// but the content of the response will contain the values the web-service sent (if any).
         /// If the web-service could not execute the request, it might return another error and a message. This is
         /// inside of the (wrapping) OperationResponse.
-        /// The class WebRpcResponse is a helper-class that extracts the most valuable content from the WebRPC 
+        /// The class WebRpcResponse is a helper-class that extracts the most valuable content from the WebRPC
         /// response.
-        /// 
+        ///
         /// See the Turnbased Feature Overview for a short intro.
-        /// http://doc.exitgames.com/en/turnbased/current/getting-started/feature-overview
+        /// http://doc.photonengine.com/en/turnbased/current/getting-started/feature-overview
         /// </remarks>
         /// <example>
         /// It's best to inherit a LoadBalancingClient into your own. Implement something like:
-        /// 
+        ///
         ///     public override void OnOperationResponse(OperationResponse operationResponse)
         ///     {
         ///         base.OnOperationResponse(operationResponse);  // important to call, to keep state up to date
-        ///     
+        ///
         ///         switch (operationResponse.OperationCode) {
         ///         case OperationCode.WebRpc:
-        ///         
+        ///
         ///             if (operationResponse.ReturnCode != 0)
         ///             {
         ///                 DebugReturn(DebugLevel.ERROR, "WebRpc failed. Response: " + operationResponse.ToStringFull());
@@ -1289,7 +1474,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
         ///                 this.OnWebRpcResponse(webResponse);
         ///             }
         ///             break;
-        ///     
+        ///
         ///         // more code [...]
         /// </example>
         public bool OpWebRpc(string uriPath, object parameters)
@@ -1298,7 +1483,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
             opParameters.Add(ParameterCode.UriPath, uriPath);
             opParameters.Add(ParameterCode.WebRpcParameters, parameters);
 
-            return this.loadBalancingPeer.OpCustom(OperationCode.WebRpc, opParameters, true); 
+            return this.loadBalancingPeer.OpCustom(OperationCode.WebRpc, opParameters, true);
         }
 
         #endregion
@@ -1457,32 +1642,26 @@ namespace ExitGames.Client.Photon.LoadBalancing
                 return;
             }
 
-            this.State = ClientState.Joined;
+            this.CurrentRoom = this.CreateRoom(this.enterRoomParamsCache.RoomName, this.enterRoomParamsCache.RoomOptions);
             this.CurrentRoom.LoadBalancingClient = this;
             this.CurrentRoom.IsLocalClientInside = true;
+            this.State = ClientState.Joined;    // TODO: maybe this set should be done later (when the room is fully setup with props and all)
+
+            if (operationResponse.Parameters.ContainsKey(ParameterCode.ActorList))
+            {
+                int[] actorsInRoom = (int[])operationResponse.Parameters[ParameterCode.ActorList];
+                this.UpdatedActorList(actorsInRoom);
+            }
 
             // the local player's actor-properties are not returned in join-result. add this player to the list
             int localActorNr = (int)operationResponse[ParameterCode.ActorNr];
             this.ChangeLocalID(localActorNr);
 
+
             Hashtable actorProperties = (Hashtable)operationResponse[ParameterCode.PlayerProperties];
             Hashtable gameProperties = (Hashtable)operationResponse[ParameterCode.GameProperties];
             this.ReadoutProperties(gameProperties, actorProperties, 0);
 
-            //TURNBASED
-            int[] actorsInGame = (int[])operationResponse[ParameterCode.ActorList];
-            if (actorsInGame != null)
-            {
-                foreach (int userId in actorsInGame)
-                {
-                    Player target = this.CurrentRoom.GetPlayer(userId);
-                    if (target == null)
-                    {
-                        Debug.WriteLine("Created player that was missing so far (no property set).");//TODO: decide if this could ever happen. it means the user had no props at all.
-                        this.CurrentRoom.StorePlayer(this.CreatePlayer(string.Empty, userId, false, null));
-                    }
-                }
-            }
             switch (operationResponse.OperationCode)
             {
                 case OperationCode.CreateGame:
@@ -1492,6 +1671,21 @@ namespace ExitGames.Client.Photon.LoadBalancing
                 case OperationCode.JoinRandomGame:
                     // TODO: add callback "game joined"
                     break;
+            }
+        }
+
+        private void UpdatedActorList(int[] actorsInGame)
+        {
+            if (actorsInGame != null)
+            {
+                foreach (int userId in actorsInGame)
+                {
+                    Player target = this.CurrentRoom.GetPlayer(userId);
+                    if (target == null)
+                    {
+                        this.CurrentRoom.StorePlayer(this.CreatePlayer(string.Empty, userId, false, null));
+                    }
+                }
             }
         }
 
@@ -1508,7 +1702,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
             Player newPlayer = new Player(actorName, actorNumber, isLocal, actorProperties);
             return newPlayer;
         }
-        
+
         /// <summary>Internal "factory" method to create a room-instance.</summary>
         protected internal virtual Room CreateRoom(string roomName, RoomOptions opt)
         {
@@ -1532,9 +1726,18 @@ namespace ExitGames.Client.Photon.LoadBalancing
         }
 
         /// <summary>
-        /// Uses the operationResponse's provided by the server to advance the internal state and call ops as needed.
+        /// Uses the OperationResponses provided by the server to advance the internal state and call ops as needed.
         /// </summary>
-        /// <remarks>This method is essential to update the internal state of a LoadBalancingClient. Overriding methods must call base.OnOperationResponse.</remarks>
+        /// <remarks>
+        /// When this method finishes, it will call your OnOpResponseAction (if any). This way, you can get any
+        /// operation response without overriding this class.
+        ///
+        /// To implement a more complex game/app logic, you should implement your own class that inherits the
+        /// LoadBalancingClient. Override this method to use your own operation-responses easily.
+        ///
+        /// This method is essential to update the internal state of a LoadBalancingClient, so overriding methods
+        /// must call base.OnOperationResponse().
+        /// </remarks>
         /// <param name="operationResponse">Contains the server's response for an operation called by this peer.</param>
         public virtual void OnOperationResponse(OperationResponse operationResponse)
         {
@@ -1543,13 +1746,13 @@ namespace ExitGames.Client.Photon.LoadBalancing
             // use the "secret" or "token" whenever we get it. doesn't really matter if it's in AuthResponse.
             if (operationResponse.Parameters.ContainsKey(ParameterCode.Secret))
             {
-                if (this.CustomAuthenticationValues == null)
+                if (this.AuthValues == null)
                 {
-                    this.CustomAuthenticationValues = new AuthenticationValues();
-                    //this.DebugReturn(DebugLevel.ERROR, "Server returned secret. Created CustomAuthenticationValues.");
+                    this.AuthValues = new AuthenticationValues();
+                    //this.DebugReturn(DebugLevel.ERROR, "Server returned secret. Created AuthValues.");
                 }
 
-                this.CustomAuthenticationValues.Secret = operationResponse[ParameterCode.Secret] as string;
+                this.AuthValues.Token = operationResponse[ParameterCode.Secret] as string;
             }
 
             switch (operationResponse.OperationCode)
@@ -1612,6 +1815,24 @@ namespace ExitGames.Client.Photon.LoadBalancing
                             break;  // if auth didn't succeed, we disconnect (above) and exit this operation's handling
                         }
 
+                        if (this.Server == ServerConnection.NameServer || this.Server == ServerConnection.MasterServer)
+                        {
+                            if (operationResponse.Parameters.ContainsKey(ParameterCode.UserId))
+                            {
+                                string incomingId = (string)operationResponse.Parameters[ParameterCode.UserId];
+                                if (!string.IsNullOrEmpty(incomingId))
+                                {
+                                    this.UserId = incomingId;
+                                    this.DebugReturn(DebugLevel.INFO, string.Format("Setting UserId sent by Server:{0}", this.UserId));
+                                }
+                            }
+                            if (operationResponse.Parameters.ContainsKey((byte)233))
+                            {
+                                this.NickName = (string)operationResponse.Parameters[(byte)233];
+                                this.DebugReturn(DebugLevel.INFO, string.Format("Setting Nickname sent by Server:{0}", this.NickName));
+                            }
+                        }
+
                         if (this.Server == ServerConnection.NameServer)
                         {
                             // on the NameServer, authenticate returns the MasterServer address for a region and we hop off to there
@@ -1629,23 +1850,17 @@ namespace ExitGames.Client.Photon.LoadBalancing
                         }
                         else if (this.Server == ServerConnection.GameServer)
                         {
-                            this.State = ClientState.ConnectingToGameserver;
+                            this.State = ClientState.Joining;
+                            this.enterRoomParamsCache.PlayerProperties = this.LocalPlayer.CustomProperties;
+                            this.enterRoomParamsCache.OnGameServer = true;
 
-                            if (this.lastJoinType == JoinType.JoinRoom || this.lastJoinType == JoinType.JoinRandomRoom) 
+                            if (this.lastJoinType == JoinType.JoinRoom || this.lastJoinType == JoinType.JoinRandomRoom || this.lastJoinType == JoinType.JoinOrCreateRoom)
                             {
-                                // if we just "join" the game, do so. if we "join-or-create", we have to set the createIfNotExists parameter to true
-                                this.State = ClientState.Joining;
-                                this.OpJoinRoom(this.CurrentRoom.Name, this.lastJoinActorNumber);
-                            }
-                            else if(this.lastJoinType == JoinType.JoinOrCreateRoom)
-                            {
-                                this.State = ClientState.Joining;
-                                this.OpJoinOrCreateRoom(this.CurrentRoom.Name, this.lastJoinActorNumber, this.createRoomOptions);
+                                this.loadBalancingPeer.OpJoinRoom(this.enterRoomParamsCache);
                             }
                             else if (this.lastJoinType == JoinType.CreateRoom)
                             {
-                                this.State = ClientState.Joining;   // yes, "joining" even though we technically create the game now on the game server
-                                this.OpCreateRoom(this.CurrentRoom.Name, this.createRoomOptions, this.CurrentLobby);
+                                this.loadBalancingPeer.OpCreateRoom(this.enterRoomParamsCache);
                             }
                             break;
                         }
@@ -1662,9 +1877,13 @@ namespace ExitGames.Client.Photon.LoadBalancing
                     this.State = ClientState.DisconnectingFromGameserver;
                     this.loadBalancingPeer.Disconnect();
                     break;
-    
+
                 case OperationCode.JoinLobby:
                     this.State = ClientState.JoinedLobby;
+                    break;
+
+                case OperationCode.LeaveLobby:
+                    this.State = ClientState.ConnectedToMaster;
                     break;
 
                 case OperationCode.JoinRandomGame:  // this happens only on the master server. on gameserver this is a "regular" join
@@ -1677,33 +1896,28 @@ namespace ExitGames.Client.Photon.LoadBalancing
                         }
                         else
                         {
-                            if (operationResponse.ReturnCode == ErrorCode.NoRandomMatchFound)
-                            {
-                                // this happens only for JoinRandomRoom
-                                // TODO: implement callback/reaction when no random game could be found (this is no bug and can simply happen if no games are open)
-                                this.state = ClientState.JoinedLobby; // TODO: maybe we have to return to another state here (if we didn't join a lobby)
-                                break;
-                            }
-
                             // TODO: handle more error cases
-
                             if (operationResponse.ReturnCode != 0)
                             {
+                                // TODO: error callbacks?! at the moment, developers have to implement this.OnOpResponseAction to get error cases of this.
+                                //if (operationResponse.ReturnCode == ErrorCode.NoRandomMatchFound)
+                                //{
+                                //    // this happens only for JoinRandomRoom
+                                //    break;
+                                //}
+
                                 if (this.loadBalancingPeer.DebugOut >= DebugLevel.ERROR)
                                 {
                                     this.DebugReturn(DebugLevel.ERROR, string.Format("Getting into game failed, client stays on masterserver: {0}.", operationResponse.ToStringFull()));
                                 }
-
-                                this.state = ClientState.JoinedLobby; // TODO: maybe we have to return to another state here (if we didn't join a lobby)
                                 break;
                             }
 
                             this.GameServerAddress = (string)operationResponse[ParameterCode.Address];
-                            string gameId = operationResponse[ParameterCode.RoomName] as string;
-                            if (!string.IsNullOrEmpty(gameId))
+                            string roomName = operationResponse[ParameterCode.RoomName] as string;
+                            if (!string.IsNullOrEmpty(roomName))
                             {
-                                // is only sent by the server's response, if it has not been sent with the client's request before!
-                                this.CurrentRoom.Name = gameId;
+                                this.enterRoomParamsCache.RoomName = roomName;
                             }
 
                             this.DisconnectToReconnect();
@@ -1712,6 +1926,8 @@ namespace ExitGames.Client.Photon.LoadBalancing
                         break;
                     }
             }
+
+            if (this.OnOpResponseAction != null) this.OnOpResponseAction(operationResponse);
         }
 
         /// <summary>
@@ -1731,9 +1947,9 @@ namespace ExitGames.Client.Photon.LoadBalancing
                         }
 
                         this.Server = ServerConnection.NameServer;
-                        if (this.CustomAuthenticationValues != null)
+                        if (this.AuthValues != null)
                         {
-                            this.CustomAuthenticationValues.Secret = null; // when connecting to NameServer, invalidate the secret (only)
+                            this.AuthValues.Token = null; // when connecting to NameServer, invalidate the secret (only)
                         }
                     }
 
@@ -1762,14 +1978,14 @@ namespace ExitGames.Client.Photon.LoadBalancing
                     if (this.IsAuthorizeSecretAvailable)
                     {
                         // if we have a token we don't have to wait for encryption (it is encrypted anyways, so encryption is just optional later on)
-                        this.didAuthenticate = this.loadBalancingPeer.OpAuthenticate(this.AppId, this.AppVersion, (this.UserId ?? this.PlayerName), this.CustomAuthenticationValues, this.CloudRegion);
+                        this.didAuthenticate = this.loadBalancingPeer.OpAuthenticate(this.AppId, this.AppVersion, this.AuthValues, this.CloudRegion, requestLobbyStatistics);
                         if (this.didAuthenticate)
                         {
                             this.State = ClientState.Authenticating;
                         }
                         else
                         {
-                            this.DebugReturn(DebugLevel.ERROR, "Error calling OpAuthenticateWithToken! Check log output, CustomAuthenticationValues and if you're connected. State: " + this.State);
+                            this.DebugReturn(DebugLevel.ERROR, "Error calling OpAuthenticateWithToken! Check log output, AuthValues and if you're connected. State: " + this.State);
                         }
                     }
                     break;
@@ -1785,17 +2001,16 @@ namespace ExitGames.Client.Photon.LoadBalancing
                     if (!this.didAuthenticate && (!this.IsUsingNameServer || this.CloudRegion != null))
                     {
                         // once encryption is availble, the client should send one (secure) authenticate. it includes the AppId (which identifies your app on the Photon Cloud)
-                        this.didAuthenticate = this.loadBalancingPeer.OpAuthenticate(this.AppId, this.AppVersion, (this.UserId ?? this.PlayerName), this.CustomAuthenticationValues, this.CloudRegion);
+                        this.didAuthenticate = this.loadBalancingPeer.OpAuthenticate(this.AppId, this.AppVersion, this.AuthValues, this.CloudRegion, requestLobbyStatistics);
                         if (this.didAuthenticate)
                         {
                             this.State = ClientState.Authenticating;
                         }
                         else
                         {
-                            this.DebugReturn(DebugLevel.ERROR, "Error calling OpAuthenticate! Did not work. Check log output, CustomAuthenticationValues and if you're connected. State: " + this.State);
+                            this.DebugReturn(DebugLevel.ERROR, "Error calling OpAuthenticate! Did not work. Check log output, AuthValues and if you're connected. State: " + this.State);
                         }
                     }
-
                     break;
 
                 case StatusCode.Disconnect:
@@ -1806,17 +2021,17 @@ namespace ExitGames.Client.Photon.LoadBalancing
 
                     if (this.State == ClientState.Disconnecting)
                     {
-                        if (this.CustomAuthenticationValues != null)
+                        if (this.AuthValues != null)
                         {
-                            this.CustomAuthenticationValues.Secret = null; // when leaving the server, invalidate the secret (but not the auth values)
+                            this.AuthValues.Token = null; // when leaving the server, invalidate the secret (but not the auth values)
                         }
                         this.State = ClientState.Disconnected;
                     }
                     else if (this.State == ClientState.Uninitialized)
                     {
-                        if (this.CustomAuthenticationValues != null)
+                        if (this.AuthValues != null)
                         {
-                            this.CustomAuthenticationValues.Secret = null; // when leaving the server, invalidate the secret (but not the auth values)
+                            this.AuthValues.Token = null; // when leaving the server, invalidate the secret (but not the auth values)
                         }
                         this.State = ClientState.Disconnected;
                     }
@@ -1835,43 +2050,43 @@ namespace ExitGames.Client.Photon.LoadBalancing
 
                 case StatusCode.DisconnectByServerUserLimit:
                     this.DebugReturn(DebugLevel.ERROR, "The Photon license's CCU Limit was reached. Server rejected this connection. Wait and re-try.");
-                    if (this.CustomAuthenticationValues != null)
+                    if (this.AuthValues != null)
                     {
-                        this.CustomAuthenticationValues.Secret = null; // when leaving the server, invalidate the secret (but not the auth values)
+                        this.AuthValues.Token = null; // when leaving the server, invalidate the secret (but not the auth values)
                     }
                     this.DisconnectedCause = DisconnectCause.DisconnectByServerUserLimit;
                     this.State = ClientState.Disconnected;
                     break;
                 case StatusCode.ExceptionOnConnect:
                 case StatusCode.SecurityExceptionOnConnect:
-                    if (this.CustomAuthenticationValues != null)
+                    if (this.AuthValues != null)
                     {
-                        this.CustomAuthenticationValues.Secret = null; // when leaving the server, invalidate the secret (but not the auth values)
+                        this.AuthValues.Token = null; // when leaving the server, invalidate the secret (but not the auth values)
                     }
                     this.DisconnectedCause = DisconnectCause.ExceptionOnConnect;
                     this.State = ClientState.Disconnected;
                     break;
                 case StatusCode.DisconnectByServer:
-                    if (this.CustomAuthenticationValues != null)
+                    if (this.AuthValues != null)
                     {
-                        this.CustomAuthenticationValues.Secret = null; // when leaving the server, invalidate the secret (but not the auth values)
+                        this.AuthValues.Token = null; // when leaving the server, invalidate the secret (but not the auth values)
                     }
                     this.DisconnectedCause = DisconnectCause.DisconnectByServer;
                     this.State = ClientState.Disconnected;
                     break;
                 case StatusCode.TimeoutDisconnect:
-                    if (this.CustomAuthenticationValues != null)
+                    if (this.AuthValues != null)
                     {
-                        this.CustomAuthenticationValues.Secret = null; // when leaving the server, invalidate the secret (but not the auth values)
+                        this.AuthValues.Token = null; // when leaving the server, invalidate the secret (but not the auth values)
                     }
                     this.DisconnectedCause = DisconnectCause.TimeoutDisconnect;
                     this.State = ClientState.Disconnected;
                     break;
                 case StatusCode.Exception:
                 case StatusCode.ExceptionOnReceive:
-                    if (this.CustomAuthenticationValues != null)
+                    if (this.AuthValues != null)
                     {
-                        this.CustomAuthenticationValues.Secret = null; // when leaving the server, invalidate the secret (but not the auth values)
+                        this.AuthValues.Token = null; // when leaving the server, invalidate the secret (but not the auth values)
                     }
                     this.DisconnectedCause = DisconnectCause.Exception;
                     this.State = ClientState.Disconnected;
@@ -1911,34 +2126,25 @@ namespace ExitGames.Client.Photon.LoadBalancing
 
                 case EventCode.Join:
                     int actorNr = (int)photonEvent[ParameterCode.ActorNr];  // actorNr (a.k.a. playerNumber / ID) of sending player
-                    bool isLocal = this.LocalPlayer.ID == actorNr;
-
                     Hashtable actorProperties = (Hashtable)photonEvent[ParameterCode.PlayerProperties];
 
-                    if (!isLocal)
+                    Player originatingPlayer = this.CurrentRoom.GetPlayer(actorNr);
+                    if (originatingPlayer == null)
                     {
                         Player newPlayer = this.CreatePlayer(string.Empty, actorNr, false, actorProperties);
                         this.CurrentRoom.StorePlayer(newPlayer);
                     }
                     else
                     {
+                        originatingPlayer.CacheProperties(actorProperties);
+                        originatingPlayer.IsInactive = false;
+                    }
+
+                    if (this.LocalPlayer.ID == actorNr)
+                    {
                         // in this player's own join event, we get a complete list of players in the room, so check if we know each of the
                         int[] actorsInRoom = (int[])photonEvent[ParameterCode.ActorList];
-                        foreach (int actorNrToCheck in actorsInRoom)
-                        {
-                            if (this.LocalPlayer.ID != actorNrToCheck && !this.CurrentRoom.Players.ContainsKey(actorNrToCheck))
-                            {
-                                this.CurrentRoom.StorePlayer(this.CreatePlayer(string.Empty, actorNrToCheck, false, null));
-                            }
-                            else if (this.CurrentRoom.Players.ContainsKey(actorNrToCheck))
-                            {
-                                Player p = null;
-                                if (this.CurrentRoom.Players.TryGetValue(actorNrToCheck, out p))
-                                {
-                                    p.IsInactive = false;
-                                }
-                            }
-                        }
+                        this.UpdatedActorList(actorsInRoom);
                     }
                     break;
 
@@ -2001,7 +2207,28 @@ namespace ExitGames.Client.Photon.LoadBalancing
                     this.RoomsCount = (int)photonEvent[ParameterCode.GameCount];
                     this.PlayersOnMasterCount = (int)photonEvent[ParameterCode.MasterPeerCount];
                     break;
+
+                case EventCode.LobbyStats:
+                    string[] names = photonEvent[ParameterCode.LobbyName] as string[];
+                    byte[] types = photonEvent[ParameterCode.LobbyType] as byte[];
+                    int[] peers = photonEvent[ParameterCode.PeerCount] as int[];
+                    int[] rooms = photonEvent[ParameterCode.GameCount] as int[];
+
+                    this.lobbyStatistics.Clear();
+                    for (int i = 0; i < names.Length; i++)
+                    {
+                        TypedLobbyInfo info = new TypedLobbyInfo();
+                        info.Name = names[i];
+                        info.Type = (LobbyType)types[i];
+                        info.PlayerCount = peers[i];
+                        info.RoomCount = rooms[i];
+
+                        this.lobbyStatistics.Add(info);
+                    }
+                    break;
             }
+
+            if (this.OnEventAction != null) this.OnEventAction(photonEvent);
         }
 
         /// <summary>In Photon 4, "raw messages" will get their own callback method in the interface. Not used yet.</summary>

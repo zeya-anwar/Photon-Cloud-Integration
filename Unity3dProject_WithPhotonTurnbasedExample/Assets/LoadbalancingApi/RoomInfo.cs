@@ -3,26 +3,26 @@
 //   Loadbalancing Framework for Photon - Copyright (C) 2011 Exit Games GmbH
 // </copyright>
 // <summary>
-//   This class resembles info about available rooms, as sent by the Master 
+//   This class resembles info about available rooms, as sent by the Master
 //   server's lobby. Consider all values as readonly.
 // </summary>
-// <author>developer@exitgames.com</author>
+// <author>developer@photonengine.com</author>
 // ----------------------------------------------------------------------------
 
 namespace ExitGames.Client.Photon.LoadBalancing
 {
     using System.Collections;
 
-#if UNITY_EDITOR || UNITY_STANDALONE_OSX || UNITY_DASHBOARD_WIDGET || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX || UNITY_STANDALONE || UNITY_WEBPLAYER || UNITY_WII || UNITY_IPHONE || UNITY_ANDROID || UNITY_PS3 || UNITY_XBOX360 || UNITY_NACL  || UNITY_FLASH  || UNITY_BLACKBERRY
+#if UNITY_EDITOR || UNITY_STANDALONE_OSX || UNITY_DASHBOARD_WIDGET || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX || UNITY_STANDALONE || UNITY_WEBPLAYER || UNITY_WII || UNITY_IPHONE || UNITY_ANDROID || UNITY_PS3 || UNITY_XBOX360 || UNITY_NACL  || UNITY_FLASH  || UNITY_BLACKBERRY || UNITY_PSP2 || UNITY_WEBGL
     using Hashtable = ExitGames.Client.Photon.Hashtable;
 #endif
 
     /// <summary>
-    /// Used for Room listings of the lobby (not yet joining). Offers the basic info about a 
+    /// Used for Room listings of the lobby (not yet joining). Offers the basic info about a
     /// room: name, player counts, properties, etc.
     /// </summary>
     /// <remarks>
-    /// This class resembles info about available rooms, as sent by the Master server's lobby. 
+    /// This class resembles info about available rooms, as sent by the Master server's lobby.
     /// Consider all values as readonly. None are synced (only updated by events by server).
     /// </remarks>
     public class RoomInfo
@@ -97,8 +97,8 @@ namespace ExitGames.Client.Photon.LoadBalancing
         /// <summary>
         /// Defines if the room can be joined.
         /// This does not affect listing in a lobby but joining the room will fail if not open.
-        /// If not open, the room is excluded from random matchmaking. 
-        /// Due to racing conditions, found matches might become closed even while you join them. 
+        /// If not open, the room is excluded from random matchmaking.
+        /// Due to racing conditions, found matches might become closed even while you join them.
         /// Simply re-connect to master and find another.
         /// Use property "IsVisible" to not list the room.
         /// </summary>
@@ -161,12 +161,21 @@ namespace ExitGames.Client.Photon.LoadBalancing
             return this.name.GetHashCode();
         }
 
-        /// <summary>Simple printing method.</summary>
-        /// <returns>String showing the RoomInfo.</returns>
+
+        /// <summary>Returns most interesting room values as string.</summary>
+        /// <returns>Summary of this RoomInfo instance.</returns>
         public override string ToString()
         {
-            return string.Format("Room: '{0}' visible: {1} open: {2} max: {3} count: {4} customProps: {5}", this.name, this.isVisible, this.isOpen, this.maxPlayers, this.PlayerCount, SupportClass.DictionaryToString(this.customProperties));
+            return string.Format("Room: '{0}' {1},{2} {4}/{3} players.", this.name, this.isVisible ? "visible" : "hidden", this.isOpen ? "open" : "closed", this.maxPlayers, this.PlayerCount);
         }
+
+        /// <summary>Returns most interesting room values as string, including custom properties.</summary>
+        /// <returns>Summary of this RoomInfo instance.</returns>
+        public string ToStringFull()
+        {
+            return string.Format("Room: '{0}' {1},{2} {4}/{3} players.\ncustomProps: {5}", this.name, this.isVisible ? "visible" : "hidden", this.isOpen ? "open" : "closed", this.maxPlayers, this.PlayerCount, SupportClass.DictionaryToString(this.customProperties));
+        }
+
 
         /// <summary>Copies "well known" properties to fields (isVisible, etc) and caches the custom properties (string-keys only) in a local hashtable.</summary>
         /// <param name="propertiesToCache">New or updated properties to store in this RoomInfo.</param>

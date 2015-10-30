@@ -3,10 +3,10 @@
 //   Loadbalancing Framework for Photon - Copyright (C) 2011 Exit Games GmbH
 // </copyright>
 // <summary>
-//   The Room class resembles the properties known about the room in which 
+//   The Room class resembles the properties known about the room in which
 //   a game/match happens.
 // </summary>
-// <author>developer@exitgames.com</author>
+// <author>developer@photonengine.com</author>
 // ----------------------------------------------------------------------------
 
 namespace ExitGames.Client.Photon.LoadBalancing
@@ -14,15 +14,14 @@ namespace ExitGames.Client.Photon.LoadBalancing
     using System;
     using System.Collections;
     using System.Collections.Generic;
-
     using ExitGames.Client.Photon;
 
-#if UNITY_EDITOR || UNITY_STANDALONE_OSX || UNITY_DASHBOARD_WIDGET || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX || UNITY_STANDALONE || UNITY_WEBPLAYER || UNITY_WII || UNITY_IPHONE || UNITY_ANDROID || UNITY_PS3 || UNITY_XBOX360 || UNITY_NACL  || UNITY_FLASH  || UNITY_BLACKBERRY
+#if UNITY_EDITOR || UNITY_STANDALONE_OSX || UNITY_DASHBOARD_WIDGET || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX || UNITY_STANDALONE || UNITY_WEBPLAYER || UNITY_WII || UNITY_IPHONE || UNITY_ANDROID || UNITY_PS3 || UNITY_XBOX360 || UNITY_NACL  || UNITY_FLASH  || UNITY_BLACKBERRY || UNITY_PSP2 || UNITY_WEBGL
     using Hashtable = ExitGames.Client.Photon.Hashtable;
 #endif
 
     /// <summary>
-    /// This class represents a room a client joins/joined. 
+    /// This class represents a room a client joins/joined.
     /// Mostly used through LoadBalancingClient.CurrentRoom, after joining any room.
     /// Contains a list of current players, their properties and those of this room, too.
     /// A room instance has a number of "well known" properties like IsOpen, MaxPlayers which can be changed.
@@ -59,7 +58,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
         /// <summary>
         /// Defines if the room can be joined.
         /// This does not affect listing in a lobby but joining the room will fail if not open.
-        /// If not open, the room is excluded from random matchmaking. 
+        /// If not open, the room is excluded from random matchmaking.
         /// Due to racing conditions, found matches might become closed while users are trying to join.
         /// Simply re-connect to master and find another.
         /// Use property "IsVisible" to not list the room.
@@ -84,7 +83,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
 
                 if (value != this.isOpen)
                 {
-                    LoadBalancingClient.OpSetPropertiesOfRoom(new Hashtable() { { GamePropertyKey.IsOpen, value } }, true);
+                    LoadBalancingClient.OpSetPropertiesOfRoom(new Hashtable() { { GamePropertyKey.IsOpen, value } }, false);
                 }
 
                 this.isOpen = value;
@@ -116,7 +115,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
 
                 if (value != this.isVisible)
                 {
-                    LoadBalancingClient.OpSetPropertiesOfRoom(new Hashtable() { { GamePropertyKey.IsVisible, value } }, true);
+                    LoadBalancingClient.OpSetPropertiesOfRoom(new Hashtable() { { GamePropertyKey.IsVisible, value } }, false);
                 }
 
                 this.isVisible = value;
@@ -147,7 +146,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
 
                 if (value != this.maxPlayers)
                 {
-                    LoadBalancingClient.OpSetPropertiesOfRoom(new Hashtable() { { GamePropertyKey.MaxPlayers, value } }, true);
+                    LoadBalancingClient.OpSetPropertiesOfRoom(new Hashtable() { { GamePropertyKey.MaxPlayers, value } }, false);
                 }
 
                 this.maxPlayers = value;
@@ -163,14 +162,14 @@ namespace ExitGames.Client.Photon.LoadBalancing
                 {
                     return 0;
                 }
-                
+
                 return (byte)this.Players.Count;
             }
         }
 
         /// <summary>While inside a Room, this is the list of players who are also in that room.</summary>
         private Dictionary<int, Player> players = new Dictionary<int, Player>();
-        
+
         /// <summary>While inside a Room, this is the list of players who are also in that room.</summary>
         public Dictionary<int, Player> Players
         {
@@ -229,7 +228,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
         /// <param name="maxPlayers">The count of players that might join this room (a well-known room-property).</param>
         /// <param name="propsListedInLobby">List of custom properties that are used in the lobby (less is better).</param>
         [Obsolete]
-        protected internal Room(string roomName, Hashtable roomProperties, bool isVisible, bool isOpen, byte maxPlayers, string[] propsListedInLobby) 
+        protected internal Room(string roomName, Hashtable roomProperties, bool isVisible, bool isOpen, byte maxPlayers, string[] propsListedInLobby)
             : base(roomName, roomProperties)
         {
             // base sets name and (custom)properties. here we set "well known" properties
@@ -242,8 +241,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
         /// <summary>Creates a Room (representation) with given name and properties and the "listing options" as provided by parameters.</summary>
         /// <param name="roomName">Name of the room (can be null until it's actually created on server).</param>
         /// <param name="options">Room options.</param>
-        protected internal Room(string roomName, RoomOptions options)
-            : base(roomName, options.CustomRoomProperties)
+        protected internal Room(string roomName, RoomOptions options) : base(roomName, options.CustomRoomProperties)
         {
             // base sets name and (custom)properties. here we set "well known" properties
             this.isVisible = options.IsVisible;
@@ -255,34 +253,60 @@ namespace ExitGames.Client.Photon.LoadBalancing
         }
 
         /// <summary>
-        /// Updates and synchronizes the named properties of this Room with the values of propertiesToSet.
+        /// Updates and synchronizes this Room's Custom Properties. Optionally, expectedProperties can be provided as condition.
         /// </summary>
         /// <remarks>
-        /// Any player can set a Room's properties. Room properties are available until changed, deleted or 
-        /// until the last player leaves the room.
-        /// Access them by: Room.CustomProperties (read-only!).
+        /// Custom Properties are a set of string keys and arbitrary values which is synchronized 
+        /// for the players in a Room. They are available when the client enters the room, as 
+        /// they are in the response of OpJoin and OpCreate.
         /// 
-        /// New properties are added, existing values are updated.
-        /// Other values will not be changed, so only provide values that changed or are new.
-        /// To delete a named (custom) property of this room, use null as value.
-        /// Only string-typed keys are applied (everything else is ignored).
+        /// Custom Properties either relate to the (current) Room or a Player (in that Room).
         /// 
-        /// Local cache is updated immediately, other clients are updated through Photon with a fitting operation.
-        /// To reduce network traffic, set only values that actually changed.
+        /// Both classes locally cache the current key/values and make them available as 
+        /// property: CustomProperties. This is provided only to read them. 
+        /// You must use the method SetCustomProperties to set/modify them.
+        /// 
+        /// Any client can set any Custom Properties anytime. It's up to the game logic to organize
+        /// how they are best used.
+        /// 
+        /// You should call SetCustomProperties only with key/values that are new or changed. This reduces
+        /// traffic and performance.
+        /// 
+        /// Unless you define some expectedProperties, setting key/values is always permitted.
+        /// In this case, the property-setting client will not receive the new values from the server but 
+        /// instead update its local cache in SetCustomProperties.
+        /// 
+        /// If you define expectedProperties, the server will skip updates if the server property-cache 
+        /// does not contain all expectedProperties with the same values.
+        /// In this case, the property-setting client will get an update from the server and update it's 
+        /// cached key/values at about the same time as everyone else.
+        /// 
+        /// The benefit of using expectedProperties can be only one client successfully sets a key from
+        /// one known value to another. 
+        /// As example: Store who owns an item in a Custom Property "ownedBy". It's 0 initally.
+        /// When multiple players reach the item, they all attempt to change "ownedBy" from 0 to their 
+        /// actorNumber. If you use expectedProperties {"ownedBy", 0} as condition, the first player to 
+        /// take the item will have it (and the others fail to set the ownership).
+        /// 
+        /// Properties get saved with the game state for Turnbased games (which use IsPersistent = true).
         /// </remarks>
-        /// <param name="propertiesToSet">Hashtable of props to udpate, set and sync. See description.</param>
-        public virtual void SetCustomProperties(Hashtable propertiesToSet)
+        /// <param name="propertiesToSet">Hashtable of Custom Properties that changes.</param>
+        /// <param name="expectedProperties">Provide some keys/values to use as condition for setting the new values.</param>
+        public virtual void SetCustomProperties(Hashtable propertiesToSet, Hashtable expectedProperties = null)
         {
             Hashtable customProps = propertiesToSet.StripToStringKeys() as Hashtable;
 
-            // merge (delete null-values)
-            this.CustomProperties.Merge(customProps);
-            this.CustomProperties.StripKeysWithNullValues();
+            // merge (and delete null-values), unless we use CAS (expected props)
+            if (expectedProperties == null || expectedProperties.Count == 0)
+            {
+                this.CustomProperties.Merge(customProps);
+                this.CustomProperties.StripKeysWithNullValues();
+            }
 
             // send (sync) these new values if in room
             if (this.IsLocalClientInside)
             {
-                this.LoadBalancingClient.OpSetCustomPropertiesOfRoom(customProps, true);
+                this.LoadBalancingClient.loadBalancingPeer.OpSetPropertiesOfRoom(customProps, false, expectedProperties);
             }
         }
 
@@ -298,7 +322,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
             Hashtable customProps = new Hashtable();
             customProps[GamePropertyKey.PropsListedInLobby] = propsToListInLobby;
 
-            bool sent = this.LoadBalancingClient.OpSetPropertiesOfRoom(customProps, true);
+            bool sent = this.LoadBalancingClient.OpSetPropertiesOfRoom(customProps, false);
             if (sent)
             {
                 this.propsListedInLobby = propsToListInLobby;
@@ -320,7 +344,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
                 this.UpdateMasterClientId();
             }
         }
-        
+
         /// <summary>
         /// Removes a player from this room's Players Dictionary.
         /// </summary>
@@ -409,7 +433,7 @@ namespace ExitGames.Client.Photon.LoadBalancing
         {
             Player result = null;
             this.Players.TryGetValue(id, out result);
-            
+
             return result;
         }
     }
