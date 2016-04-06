@@ -9,11 +9,11 @@ public class DemoGUI : MonoBehaviour
     public string AppId;            //set this in the editor in a scene!
     public Rect LobbyRect;  // set in inspector to position the lobby screen
     public Rect leftToolbar;  // set in inspector to position the lobby screen
-	
+
 
 	public int gui_depth = 2;
 	public PlayFabIntegration playfabComponent;
-	
+
     public void Start()
     {
         Application.runInBackground = true;
@@ -24,33 +24,30 @@ public class DemoGUI : MonoBehaviour
         this.GameInstance = new DemoGame();
         this.GameInstance.AppId = this.AppId;       // set in Inspector
         this.GameInstance.AppVersion = "1.0";
-        this.GameInstance.PlayerName = !string.IsNullOrEmpty(NamepickerGui.NickName) ? NamepickerGui.NickName : "unityPlayer";
+        this.GameInstance.NickName = !string.IsNullOrEmpty(NamepickerGui.NickName) ? NamepickerGui.NickName : "unityPlayer";
 
         this.GameInstance.OnStateChangeAction += this.OnStateChanged;
-        
+
 		playfabComponent.LoginToPlayFab();
-			
+
 	}
 
 	public void ConnectToMasterServer(string id, string ticket)
-	{	
-		if(this.GameInstance.CustomAuthenticationValues != null)
-		{
-			this.GameInstance.CustomAuthenticationValues.SetAuthParameters(id, ticket);
-		}
-		else
-		{
-			//Debug.Log(string.Format("Id: {0}, Ticket: {1}", id, ticket));
-			this.GameInstance.CustomAuthenticationValues = new AuthenticationValues()
-			{
-				AuthType = CustomAuthenticationType.Custom,
-				Secret = null,
-				AuthParameters = null,
-			};
-			
-			this.GameInstance.CustomAuthenticationValues.SetAuthParameters(id, ticket);
-		}
-		this.GameInstance.ConnectToRegionMaster("US");  // Turnbased games have to use this connect via Name Server
+	{
+
+        AuthenticationValues customAuth = new AuthenticationValues();
+	    customAuth.AuthType = CustomAuthenticationType.Custom;
+        customAuth.AddAuthParameter("username", id);    // expected by PlayFab custom auth service
+        customAuth.AddAuthParameter("token", ticket);   // expected by PlayFab custom auth service
+
+        this.GameInstance.AuthValues = customAuth;
+
+        //this.GameInstance.AutoJoinLobby = false;                      // use this, if you don't list current rooms
+	    this.GameInstance.loadBalancingPeer.QuickResendAttempts = 2;    // option to re-send reliable stuff more quickly
+        this.GameInstance.loadBalancingPeer.SentCountAllowance = 8;     // default + some quick resends
+
+
+        this.GameInstance.ConnectToRegionMaster("US");  // connect to the US region of Photon Cloud
 	}
 
 
@@ -85,7 +82,7 @@ public class DemoGUI : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             Application.Quit();
-        } 
+        }
     }
 
     public void OnGUI()
@@ -99,7 +96,7 @@ public class DemoGUI : MonoBehaviour
         GUI.skin.button.stretchWidth = true;
         GUI.skin.button.fixedWidth = 0;
 
-        GUILayout.Label("name: " + this.GameInstance.PlayerName + " state: " + GameInstance.State.ToString());
+        GUILayout.Label("name: " + this.GameInstance.NickName + " state: " + GameInstance.State.ToString());
 
         if (!string.IsNullOrEmpty(this.GameInstance.ErrorMessageToShow))
         {
@@ -119,7 +116,6 @@ public class DemoGUI : MonoBehaviour
                 {
 					playfabComponent.LoginToPlayFab();
 					//this.GameInstance.ConnectToRegionMaster("US");  // Turnbased games have to use this connect via Name Server
-                    
                 }
                 break;
         }
@@ -130,7 +126,7 @@ public class DemoGUI : MonoBehaviour
         GUILayout.BeginArea(LobbyRect);
         GUILayout.Label("Lobby Screen");
         GUILayout.Label(string.Format("Players in rooms: {0} looking for rooms: {1}  rooms: {2}", this.GameInstance.PlayersInRoomsCount, this.GameInstance.PlayersOnMasterCount, this.GameInstance.RoomsCount));
-        
+
         if (GUILayout.Button("Join Random (or create)"))
         {
             this.GameInstance.OpJoinRandomRoom(null, 0);
@@ -245,7 +241,7 @@ public class DemoGUI : MonoBehaviour
         {
             this.GameInstance.ClearAllTileClickEv();
         }
-        
+
         if (GUILayout.Button("Clear Ev Cache (turn)  " + (this.GameInstance.turnNumber-1)))
         {
             this.GameInstance.ClearTileClickEvForTurn(this.GameInstance.turnNumber-1);
@@ -256,9 +252,9 @@ public class DemoGUI : MonoBehaviour
             this.GameInstance.CurrentRoom.IsOpen = false;
             this.GameInstance.CurrentRoom.IsVisible = false;
         }
-        
+
         GUI.color = this.playfabComponent.pf_orange;
-      	
+
       	GUILayout.Label("Custom Room Events:");
 		if (GUILayout.Button("Win MVP"))
 		{
@@ -269,20 +265,20 @@ public class DemoGUI : MonoBehaviour
 			this.playfabComponent.GrantExperience();
 		}
 		GUI.color = Color.white;
-		
+
 		GUILayout.FlexibleSpace();
-		
+
 		if (GUILayout.Button("Leave (return later)"))
         {
             this.GameInstance.OpLeaveRoom(true);
-			
+
 			// PlayFab
 			this.playfabComponent.LeaveGame();
 		}
 		if (GUILayout.Button("Abandon"))
         {
             this.GameInstance.OpLeaveRoom(false);
-           
+
            	// PlayFab
 			this.playfabComponent.LeaveGame();
 		}

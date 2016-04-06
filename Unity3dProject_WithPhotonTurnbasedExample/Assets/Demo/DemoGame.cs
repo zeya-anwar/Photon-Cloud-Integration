@@ -1,6 +1,6 @@
 using System.Collections;
 using ExitGames.Client.Photon;
-using ExitGames.Client.Photon.Lite;
+
 using ExitGames.Client.Photon.LoadBalancing;
 using System.Collections.Generic;
 using UnityEngine;
@@ -252,7 +252,7 @@ public class DemoGame : LoadBalancingClient
     /// </summary>
     public void CreateTurnbasedRoom()
     {
-        string newRoomName = this.PlayerName + "-" +Random.Range(0,1000).ToString("D4");    // for int, Random.Range is max-exclusive!
+        string newRoomName = this.NickName + "-" +Random.Range(0,1000).ToString("D4");    // for int, Random.Range is max-exclusive!
         Debug.Log("CreateTurnbasedRoom() will create: " + newRoomName);
 
         RoomOptions demoRoomOptions = new RoomOptions()
