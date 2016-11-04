@@ -8,7 +8,7 @@ The demo (DemoFriends-Scene provides) provides a simple and straightforward appr
 
 2. Prerequisites:
 ----
-Users should be very familiar with the content presented in our [Using Photon Guide](https://playfab.com/doc/categories/using-photon-with-playfab/).
+Users should be very familiar with the content presented in our [Using Photon Guide](https://api.playfab.com/docs/using-photon-with-playfab/).
 
 There are several factors which must be in place before triggering your web hooks. For the purposes of getting up and running as fast as possible, we have included several test resources that will need to be replaced by your own.
 
